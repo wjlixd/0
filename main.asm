@@ -107,7 +107,7 @@ _SaveSucessTable:
     JMP     _Config_Save_ChannelNums; 01
     JMP     FlashSucess             ; 02
     JMP     _SetTxData_SaveTData    ; 03
-    JMP     _RxDataEndTable         ; 04
+    JMP     _SetRxData_SaveRData    ; 04
     JMP     _SaveRNode              ; 05
 ;*************************************************
 ;//MARK: 写EPROM失败列表
@@ -517,15 +517,13 @@ _ConfigRxNode:                          ; 没按键时，进行设置 MyNode 模式
 _RxData_GetData:
     MOV     A,@C_PreTxData              ;  等待 15秒
     CALL    ResetQuitTime_Mode          ; 
-    CALL    ClrFailFlag
 PreTxData:
-
     JBC     P_IRQ,B_IRQ
     JMP     TxData
 
     CALL    ReadSpiData                 ; 从SPI缓冲区读数据
-    JMP     _SaveTestNData
 
+    BC      EpNum,F_RFail
     CALL    SetEp_RData
     MOV     A,@C_SaveEp_RNode           ;保存测试数据
     JBC     TRFlagReg,F_EpTRData
@@ -604,7 +602,7 @@ SetTx_MyChannel:
 ;************************************************
 _TxData2RxData:
     MOV     A,@C_Tx2Rx_Code4B
-    JMP     PresetTx2Rx                 ; 发送完成，转为接收模式
+    JMP     PresetTx2Rx                 ; R1 发送完成，转为接收模式
 
 _ConfigRxData:                          ; 收到返回信息 
     CALL    GetInfoType                 ; 返回类型
@@ -612,21 +610,21 @@ _ConfigRxData:                          ; 收到返回信息
     XOR     A,RF_InfoType
     JBS     StatusReg,ZeroFlag
     JMP     QuitToIdle                  ; 类型错，重来
-    JMP     _TxDataSaveTable
+    JMP     _TxDataSaveTable            ; 类型相同，保存
 ;************************************************
-_Config_SaveTxCode:
+_Config_SaveTxCode:                     ; R2 -2
     INC     ChannelNums
     CALL    SetEpParam_TxCode
 
     MOV     A,@C_SaveEp_TxCode   ; 写EP完成 到WaitWriteTxNum
     JMP     PresetSaveEp
 ;************************************************
-_Config_SaveNode:
+_Config_SaveNode:                       ; R2 -0 设置节点，ChannelNum +1
     INC     ChannelNums
 _Config_Save_ChannelNums:
     CALL    _ChannelNum_EpTable
     CALL    SetEp_ChannelNums
-    MOV     A,@C_SaveEp_ChannelNums ; 1 - MyNode/SWNums/TxNums读到ChannelNums
+    MOV     A,@C_SaveEp_ChannelNums     ; 1 - MyNode/SWNums/TxNums读到ChannelNums
     JMP     PresetSaveEp
 ;************************************************
 ;  发送端：  系统参数初始化

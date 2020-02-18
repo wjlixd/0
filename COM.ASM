@@ -567,7 +567,7 @@ _I2C_WritePageLoop:
 PresetRx2Tx:
     MOV     SPI_Mode,A
 
-    MOV     A,@3
+    MOV     A,@5
     CALL    SetQuitTime_ms          ; 等待时间最少32ms     
     MOV     A,@C_WaitRx2TxEnd
     MOV     TRMode,A
@@ -617,7 +617,7 @@ _SetTxDataEnd:
 ;// WaitTxDataEnd 等待发送信道码完成，变为接收模式
 WaitTxDataEnd:
     JBC     P_IRQ,B_IRQ
-    JMP     main
+    JMP     $+5
 
     CALL    SPI_READSTATUS
     JBC     PrgTmp3,TX_DS
