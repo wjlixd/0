@@ -519,10 +519,12 @@ _RxData_GetData:
     CALL    ResetQuitTime_Mode          ; 
     CALL    ClrFailFlag
 PreTxData:
+
     JBC     P_IRQ,B_IRQ
     JMP     TxData
 
     CALL    ReadSpiData                 ; 从SPI缓冲区读数据
+    JMP     _SaveTestNData
 
     CALL    SetEp_RData
     MOV     A,@C_SaveEp_RNode           ;保存测试数据

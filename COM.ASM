@@ -616,23 +616,23 @@ _SetTxDataEnd:
 ;************************************************
 ;// WaitTxDataEnd 等待发送信道码完成，变为接收模式
 WaitTxDataEnd:
-    DJZA    QuitTime
-    JMP     $+3
-    BS      EpNum,F_TFail           ; 超时，设置发送失败标志
-    JMP     _SaveTestTData			; 超次数重发
-
     JBC     P_IRQ,B_IRQ
     JMP     main
 
     CALL    SPI_READSTATUS
-    JBS     PrgTmp3,TX_DS
-    BS      EpNum,F_TFail           ; 发送失败
+    JBC     PrgTmp3,TX_DS
+    JMP     _SaveTestTData
+    JMP     $+3
 
+    DJZA    QuitTime
+    JMP     main
+    BS      EpNum,F_TFail           ; 发送失败
 _SaveTestTData:
     CALL    SetEp_TData
     MOV     A,@C_SaveEp_TData       ;保存测试数据
     JBC     TRFlagReg,F_EpTRData
     JMP     PresetSaveEp
+
 _SetTxData_SaveTData:
     JBS    EpNum,F_TFail
     JMP     _TxDataEndTable         ; 数据发送成功
@@ -669,27 +669,25 @@ _RxCode4B:
 ;************************************************
 WaitRxDataReturn:                   ; 等待接收端返回节点数据
     CALL    FLed_SlowBlink
-    DJZA    QuitTime
-    JMP     CheckRxIRQ
-    BS      EpNum,F_RFail
-    JMP     _SaveTestRData
-
-CheckRxIRQ:
     JBC     P_IRQ,B_IRQ
-    JMP     main
+    JMP     $+3
 
     CALL    ReadSpiData             ; 从SPI缓冲区读数据
-_SaveTestRData:
+    JMP     _SaveTestRData
+
+    DJZA    QuitTime
+    JMP     main
+    BS      EpNum,F_RFail
+_SaveTestRData:    
     CALL    SetEp_RData
     MOV     A,@C_SaveEp_RData       ;保存测试数据
+    JBC     TRFlagReg,F_EpTRData
     JMP     PresetSaveEp            ; 转到数据处理列表
     
 _SetRxData_SaveRData:
     JBS     EpNum,F_RFail
     JMP     _RxDataEndTable         ; 接收到数据处理列表
     JMP     _RxTimeOverTable
-
-
 ;************************************************
 ;//MARK:    保存EPROM进程
 PresetSaveEp:
