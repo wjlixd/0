@@ -1,0 +1,1 @@
+C:\Progra~1\Compareit\wincmp3.exe %1 %2
