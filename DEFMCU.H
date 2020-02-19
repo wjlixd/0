@@ -1,0 +1,5 @@
+	EM78P153	equ		1
+	EM78P156	equ		2
+	EM78911		equ		3
+	EM78F734	equ		4
+
