@@ -573,7 +573,7 @@ TxData:
     SUB     A,ChannelNums
     JBC     StatusReg,CarryFlag
     JMP     QuitToIdle                  ; TxChannelNum >=5 ,不能再设置，直接退出
-
+; 长按3秒，再短按键后，进入， 设置TX数据模式          **** A ****
     MOV     A,@C_TxData_Config          ; 设置 config 通道
     JMP     PresetTxData
 _TxData_SetData:                        ; 设置数据开始
@@ -581,6 +581,7 @@ _TxData_SetData:                        ; 设置数据开始
     MOV     RF_InfoType,A
     JMP     _ConfigSetTxData            ; 填充发送数据包 ,等待发送完成
 ;************************************************
+; 填充数据包部分， 由SetMode 确定数据种类             **** B ****
 ;//MARK: SetTX_Node 设置节点
 SetTX_Node:     ; 传输最大节点号给接收端
     CALL    SetEp_MaxNode               ; 设置 最大节点值
@@ -599,32 +600,34 @@ SetTx_MyChannel:
     MOV     A,@0xFF                     ; 开关节点，不发送，接收方接收到 FF，不保存
     MOV     RF_MaxNode,A                ;
     JMP     _SetTxDataEnd
-;************************************************
-_TxData2RxData:
+;************************************************  数据包完成，发送数据，等待发送结束
+_TxData2RxData:                         ;转换为接收模式**** C ****
     MOV     A,@C_Tx2Rx_Code4B
     JMP     PresetTx2Rx                 ; R1 发送完成，转为接收模式
 
 _ConfigRxData:                          ; 收到返回信息 
-    CALL    GetInfoType                 ; 返回类型
+    CALL    GetInfoType                 ; 返回类型检查 **** D ****
     ADD     A,@1
     XOR     A,RF_InfoType
     JBS     StatusReg,ZeroFlag
     JMP     QuitToIdle                  ; 类型错，重来
     JMP     _TxDataSaveTable            ; 类型相同，保存
 ;************************************************
-_Config_SaveTxCode:                     ; R2 -2
+;不同的数据类型，分别处理。                            **** E ****
+_Config_SaveTxCode:                     ; 类型 SetMode = 2 ,保存下游信道码
     INC     ChannelNums
     CALL    SetEpParam_TxCode
 
     MOV     A,@C_SaveEp_TxCode   ; 写EP完成 到WaitWriteTxNum
     JMP     PresetSaveEp
-;************************************************
-_Config_SaveNode:                       ; R2 -0 设置节点，ChannelNum +1
+                                        ; 类型 SetMode = 1 ,设置开关节点，数据不保存，NUMS不保存，直接转 成功 **** G ****
+_Config_SaveNode:                       ; 类型 SetMode = 0 ,设置节点+1，准备保存
     INC     ChannelNums
-_Config_Save_ChannelNums:
+
+_Config_Save_ChannelNums:               ; 
     CALL    _ChannelNum_EpTable
     CALL    SetEp_ChannelNums
-    MOV     A,@C_SaveEp_ChannelNums     ; 1 - MyNode/SWNums/TxNums读到ChannelNums
+    MOV     A,@C_SaveEp_ChannelNums     ;              **** F **** 保存 ChannelNums 后。转成功 **** G ****
     JMP     PresetSaveEp
 ;************************************************
 ;  发送端：  系统参数初始化

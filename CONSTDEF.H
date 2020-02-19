@@ -29,8 +29,8 @@ F_32ms              equ      F_AddrMarried
 
     C_E2Addr_Config             ==   0x03
 
-    C_E2Addr_TData              ==   0x10   ; 发送数据保存
-    C_E2Addr_RData              ==   0x18   ; 接收数据保存
+    C_E2Addr_TData              ==   0x08   ; 发送数据保存
+    C_E2Addr_RData              ==   0x17   ; 接收数据保存
 
     C_EpAddr_RxChannel          ==   0x20   ; 接收信道参数,开关，不接收，这个参数无用
 
