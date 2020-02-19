@@ -12,6 +12,9 @@ F_16ms              equ      7       ;
 F_32ms              equ      F_AddrMarried
 ;****************************************************
 ;TRFlagReg         
+    F_DisSlepLed    equ      6      ; 0 - 睡眠时LED来，  1 -睡眠时LED亮
+    F_DisSetNode    equ      5      ; 0 - 允许设置节点，   1 - 不允许设置节点。 如果上游节点设置过我的节点，则不再允许我设置其它节点
+
     F_QuitTime32ms  equ      4      ; 0 - QuitTime每500ms减1， 1-QuitTime 每32ms减1
     F_500ms         equ      3      ; 1 - 500ms 时间到，
     F_250ms         equ      2      ; 1 - 250ms 时间到
@@ -25,8 +28,8 @@ F_32ms              equ      F_AddrMarried
 ; eprom 地址分配
     C_E2Addr_DevAddr            ==   0x00   ; 0x00   7位地址;
                                             ; 0x01   10位地址
-    C_E2Addr_Sleep              ==   0x02
-
+    C_E2Addr_Sleep              ==   0x01
+    C_E2Addr_Flag               ==   0x02
     C_E2Addr_Config             ==   0x03
 
     C_E2Addr_TData              ==   0x08   ; 发送数据保存

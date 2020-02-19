@@ -1,5 +1,5 @@
 ;    RF24L01    发送端模块  
-;    2020.02,19,   chksum: 9197,睡眠前设置24L01 掉电模式
+;    2020.02,19,   chksum: 50D6,睡眠前设置24L01 掉电模式,增加睡眠LED亮
 
 include	"option.h"
 if MCU == 0
@@ -17,6 +17,72 @@ include "macro.h"
 
     ORG     0
     JMP     McuReset
+;************************************************************************
+; 恢复参数表
+
+_ResetAddrTable:
+    DECA    SetMode
+    ADD     PC,A
+    RETL    @C_E2Addr_Flag
+    RETL    @C_E2Addr_MyNode
+    RETL    @C_EpAddr_TxChannel
+    RETL    @C_EpAddr_TxChannel+0x10
+
+_ResetSizeTable:
+    DECA    SetMode
+    ADD     PC,A
+    RETL    @5          ; 系统参数
+    RETL    @4          ; 接收参数
+    RETL    @4          ; 发送参数1
+    RETL    @4          ; 发送参数2
+
+_ResetParamTable:
+    DECA    SetMode
+    ADD     PC,A
+    JMP     _ResetTable1
+    JMP     _ResetTable2
+    JMP     _ResetTable3
+
+_ResetTable4:           ; EP = 0x40
+    MOV     A,PrgTmp2
+    ADD     PC,A
+    RETL    @0xB1       ; 信道码 01      
+    RETL    @0xB2       ; 信道码 02      
+    RETL    @0xB3       ; 信道码 03      
+    RETL    @0x05       ; RF-CH      
+
+_ResetTable3:           ; EP = 0x30
+    MOV     A,PrgTmp2
+    ADD     PC,A
+    RETL    @0xA1       ; 信道码 01      
+    RETL    @0xA2       ; 信道码 02      
+    RETL    @0xA3       ; 信道码 03      
+    RETL    @0x02       ; RF-CH     
+
+_ResetTable2:           ; EP = 0x23
+    MOV     A,PrgTmp2
+    ADD     PC,A
+    RETL    @0x01       ; MyNode        RF-CH      
+    RETL    @0x02       ; MaxNode       设置节点数
+    RETL    @0x01       ; TxChannelNums 发送信道数
+    RETL    @0x02       ; SWNums        设置开关数
+
+_ResetTable1:           ; EP = 0x02
+    MOV     A,PrgTmp2
+    ADD     PC,A
+    RETL    @0x00       ; 系统标志位    
+    RETL    @0x34       ; 信道码 01      
+    RETL    @0x43       ; 信道码 02      
+    RETL    @0x10       ; 信道码 03      
+    RETL    @0x00       ; RF-CH      
+
+;************************************************************************
+_ConfigKeyChkTable:     ; 长按键3秒后，是否对短按键进行检查
+    MOV     A,SetMode
+    ADD     PC,A
+    JMP     _ConfigKeyChk_SetNode
+    JMP     _ConfigKeyChkEnd            ; 设置 SW INFO不检查按键
+    JMP     _ConfigKeyChk_Code
 
 _ConfigTable:
     MOV     A,SetMode
@@ -25,70 +91,12 @@ _ConfigTable:
     JMP     _ConfigTxSWNode
     JMP     _ConfigTxChannelCode
 
-_RxChannelTable:
-    DECA    SetMode
-    ADD     PC,A
-    JMP     _ResetTable1
-    JMP     _ResetTable2
-    JMP     _ResetTable3
-
-_ResetTable5:           ; 发送信道
-    MOV     A,PrgTmp2
-    ADD     PC,A
-    RETL    @0xB1       ; 信道码 01      
-    RETL    @0xB2       ; 信道码 02      
-    RETL    @0xB3       ; 信道码 03      
-    RETL    @0x05       ; RF-CH      
-
-
-_ResetTable1:           ; EP = 0x23
-    MOV     A,PrgTmp2
-    ADD     PC,A
-    RETL    @0x01       ; MyNode        RF-CH      
-    RETL    @0x02       ; MaxNode       设置节点数
-    RETL    @0x01       ; TxChannelNums 发送信道数
-    RETL    @0x02       ; SWNums        设置开关数
-
-_ResetTable2:           ; EP = 0x03
-    MOV     A,PrgTmp2
-    ADD     PC,A
-    RETL    @0x34       ; 信道码 01      
-    RETL    @0x43       ; 信道码 02      
-    RETL    @0x10       ; 信道码 03      
-    RETL    @0x00       ; RF-CH      
-
-_ResetTable3:           ; EP = 0x03
-    MOV     A,PrgTmp2
-    ADD     PC,A
-    RETL    @0xA1       ; 信道码 01      
-    RETL    @0xA2       ; 信道码 02      
-    RETL    @0xA3       ; 信道码 03      
-    RETL    @0x02       ; RF-CH     
-
 _ChannelNum_EpTable:
     MOV     A,SetMode
     ADD     PC,A
     RETL    @C_E2Addr_MaxNode
     RETL    @C_E2Addr_SWNums
     RETL    @C_E2Addr_TxChannelNums
-
-_ResetAddrTable:
-    DECA    SetMode
-    ADD     PC,A
-    RETL    @C_E2Addr_MyNode
-    RETL    @C_E2Addr_Config
-    RETL    @C_EpAddr_TxChannel
-    RETL    @C_EpAddr_TxChannel+0x10
-
-_ResetSizeTable:
-    ; DECA    SetMode
-    ; ADD     PC,A
-    ; RETL    @7
-    ; RETL    @4
-    ; RETL    @2
-    ; RETL    @2
-    RETL    @4
-
 
 ;*************************************************
 ;//MARK: 写EPROM成功列表
@@ -99,6 +107,7 @@ _ResetSizeTable:
     C_SaveEp_TData      ==      03
     C_SaveEp_RData      ==      04
     C_SaveEp_RNode      ==      05
+    C_SaveEp_Flag       ==      06
 
 _SaveSucessTable:
     MOV     A,Ep_Mode
@@ -109,6 +118,7 @@ _SaveSucessTable:
     JMP     _SetTxData_SaveTData    ; 03
     JMP     _SetRxData_SaveRData    ; 04
     JMP     _SaveRNode              ; 05
+    JMP     ConfigRcv_SaveMyNode    ; 06
 ;*************************************************
 ;//MARK: 写EPROM失败列表
 ; _SaveFailTable:
@@ -168,7 +178,7 @@ _TxDataEndTable:
     MOV     A,SPI_Mode
     ADD     PC,A
     JMP     _TxData2RxData
-    JMP     ConfigRcv_SaveMyNode
+    JMP     ConfigRcv_SaveFlag 
     JMP     _TxTrans_TxEnd
 
 ; 发送数据失败处理
@@ -411,20 +421,22 @@ ChkSlep:
     JBS     TRFlagReg,F_EnSlep
     JMP     main
 
+    JBS     TRFlagReg,F_DisSlepLed
+    BS      P_LED,B_LED
+
     BC      P_CE,B_CE
     MOV     A,@0x00                 ; 掉电模式
     CALL    SetSPI_CONFIG
-
 ;//MARK: Slep睡眠 
-    MOV     A,@P6_IO_Slep
-    IOW     Port6
-    CLR     Port6
+    BC      P_COL1,B_COL1           ; 按键0，接收按键唤醒
+
     M_Sleep
-    MOV     A,@P6_IO_Init
-    IOW     Port6   
 
     MOV     A,@0x3F                 ; 待机1模式
     CALL    SetSPI_CONFIG
+
+    JBS     TRFlagReg,F_DisSlepLed
+    BC      P_LED,B_LED
 
     JMP     QuitToIdle    
 ;******************************************************** 
@@ -551,6 +563,15 @@ ConfigRcv_SetNode:
     INC     RF_InfoType
     JMP     _SetTxDataEnd
 
+ConfigRcv_SaveFlag:
+    BS      TRFlagReg,F_DisSetNode      ; 将标志保存EPROM
+    MOV     A,TRFlagReg
+    MOV     ChannelNums,A
+    MOV     A,@C_E2Addr_Flag
+    CALL    SetEp_ChannelNums
+    MOV     A,@C_SaveEp_Flag
+    JMP     PresetSaveEp
+
 ConfigRcv_SaveMyNode:
     MOV     A,RF_MaxNode
     MOV     ChannelNums,A
@@ -568,16 +589,18 @@ TxData:
     JBS     StatusReg,CarryFlag
     JMP     Key3sTimeoutToIdle          ; 长按3秒退出，超时退出 
 
-    MOV     A,SetMode
-    XOR     A,@C_KeyValueSW
-    JBC     StatusReg,ZeroFlag
-    JMP     $+5                         ; 设置开关，不检查键值
+    JMP     _ConfigKeyChkTable
 
+_ConfigKeyChk_SetNode:
+    JBC     TRFlagReg,F_DisSetNode
+    JMP     QuitToIdle
+_ConfigKeyChk_Code:
     CALL    GetKeyValue
     XOR     A,SetMode
     JBS     StatusReg,ZeroFlag
     JMP     QuitToIdle
 
+_ConfigKeyChkEnd:
     CALL    GetMaxNums
     SUB     A,ChannelNums
     JBC     StatusReg,CarryFlag
@@ -673,7 +696,7 @@ _ConfirmResetNext:
     MOV     RamSelReg,A
     CLR     PrgTmp2
 
-    CALL    _RxChannelTable
+    CALL    _ResetParamTable
     MOV     R0,A
     INC     PrgTmp2
     INC     RamSelReg
@@ -722,15 +745,22 @@ McuReset:
     CLRRAM
     InitPort20191229
 
-    MOV     A,@C_E2Addr_Sleep                   ; 把 Sleep 设置读到 ChannelNums
-    CALL    SetEp_ChannelNums
+    MOV     A,@C_E2Addr_DevAddr                   ; 把 Sleep 设置读到 ChannelNums
+    CALL    SetEpParamCh0
     MOV     A,@C_ReadEp_Sleep
     JMP     PresetReadEp
 _McuReset_Sleep:
-    JBC     ChannelNums,F_EnSlep
+    JBC     RF_Data+1,0
     BS      TRFlagReg,F_EnSlep
-    JBS     ChannelNums,F_EpTRData
+
+    JBS     RF_Data+1,1
     BS      TRFlagReg,F_EpTRData
+
+    JBC     RF_Data+1,2
+    BS      TRFlagReg,F_DisSlepLed
+
+    JBC     RF_Data+2,F_DisSetNode
+    BS      TRFlagReg,F_DisSetNode
     JMP     QuitToIdle
 
 ;*************************************
