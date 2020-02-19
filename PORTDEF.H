@@ -4,7 +4,7 @@ CONT_Init		equ		0b01000111;	初始化设置 UART ，C_UartCont
 ;        分频比 111 = 256
 ;        TCC计数256
 ;   频率 = 4M/2/256/256= 32hz  中断时间32ms
-IntMask			equ		0;
+IntMask			equ		0		  ;
 OpenDrain_Init	equ		0b00000000;             SDA,SCL 为OD输出
 PortPL_Init     equ     0b00000000;
 ;  初始注意：  CSN  - 1, SCK - 0
@@ -22,13 +22,8 @@ PortPL_Init     equ     0b00000000;
 ;           ------  2  -- VCC
 ;           ------  1  -- GND
 ;*********************************************************
-ifdef  EMUP
-P_CE            equ     Port50       ; 输出至RF， RX/TX模式选择
-B_CE            equ     Bit50
-else
 P_CE            equ     Port51       ; 输出至RF， RX/TX模式选择
 B_CE            equ     Bit51
-endif
                                 
 P_CSN           equ     Port52
 B_CSN           equ     Bit52           ; 输出至RF, SPI EN信号
@@ -51,35 +46,32 @@ B_SDA           equ     Bit64
 P_SCL           equ     Port65
 B_SCL           equ     Bit65
 
-ifdef EMUP
-P_LED           equ     Port51
-B_LED           equ     Bit51
-else
-P_LED           equ     Port50
-B_LED           equ     Bit50
-endif
-P_ROW1          equ     Port63
-B_ROW1          equ     Bit63
+P_LED           equ     Port67
+B_LED           equ     Bit67
 
-P_ROW2          equ     Port66
-B_ROW2          equ     Bit66
+P_KEY           equ     Port66
+B_KEY           equ     Bit66
 
-P_COL1          equ     Port67
-B_COL1          equ     Bit67
+P_Relay         equ     Port50
+B_Relay         equ     Bit50
+
+
+	KeyPort         ==      P_KEY
+    Key_B           ==      B_KEY		    ; 
+
+
 ;******************************************************
 ;  Master,  Slaver共用总线
 I2CS_Port       equ     P_SDA
 SlaverSDA       equ     B_SDA
 SlaverSCL       equ     B_SCL
 
-P6_IO_Init		equ     (1<<B_SCL)|(1<<B_SDA)|(1<<B_ROW1)|(1<<B_ROW2)|(1<<B_IRQ)|(1<<BI_MISO)
+P6_IO_Init		equ     (1<<B_SCL)|(1<<B_SDA)|(1<<B_KEY)|(1<<B_IRQ)|(1<<BI_MISO)
 P6_R_Init		equ     0
 
-PortPH_Init		equ		(1<<B_SCL)|(1<<B_SDA)|(1<<B_ROW2)|(1<<B_IRQ);|(1<<B_ROW1)
+PortPH_Init		equ		(1<<B_SCL)|(1<<B_SDA)|(1<<B_KEY)|(1<<B_IRQ)
 
-C_I2CBusOut     equ     (1<<B_ROW1)|(1<<B_ROW2)|(1<<B_IRQ)|(1<<BI_MISO)
+C_I2CBusOut     equ     (1<<B_KEY)|(1<<B_IRQ)|(1<<BI_MISO)
 
 P5_IO_Init      equ     0b00000000;
 P5_R_Init       equ     0b00000100;
-
-P6_IO_Slep      equ     (1<<B_ROW1)|(1<<B_ROW2)

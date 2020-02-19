@@ -48,33 +48,36 @@ B_SDA           equ     Bit70
 P_SCL           equ     Port71
 B_SCL           equ     Bit71
 
-P_LED           equ     Port50
-B_LED           equ     Bit50
+P_LED           equ     Port73
+B_LED           equ     Bit73
 
-P_ROW1          equ     Port63
-B_ROW1          equ     Bit63
+P_KEY           equ     Port72
+B_KEY           equ     Bit72
 
-P_ROW2          equ     Port72
-B_ROW2          equ     Bit72
+P_Relay         equ     Port50
+B_Relay         equ     Bit50
 
-P_COL1          equ     Port73
-B_COL1          equ     Bit73
+
+	KeyPort         ==      P_KEY
+    Key_B           ==      B_KEY		    ; 
+
+
 ;******************************************************
 ;  Master,  Slaver共用总线
 I2CS_Port       equ     P_SDA
 SlaverSDA       equ     B_SDA
 SlaverSCL       equ     B_SCL
 
-P6_IO_Init		equ     (1<<B_ROW1)|(1<<B_IRQ)|(1<<BI_MISO)
+P6_IO_Init		equ     (1<<B_IRQ)|(1<<BI_MISO)
 P6_R_Init		equ     0
 
-P7_IO_Init		equ     (1<<B_SCL)|(1<<B_SDA)|(1<<B_ROW2)
+P7_IO_Init		equ     (1<<B_SCL)|(1<<B_SDA)|(1<<B_KEY)
 P7_R_Init		equ     0
 
-Port6PH_Init    equ     (1<<B_IRQ);|(1<<B_ROW1)
-Port7PH_Init    equ     (1<<B_SCL)|(1<<B_SDA)|(1<<B_ROW2)
+Port6PH_Init    equ     (1<<B_IRQ)
+Port7PH_Init    equ     (1<<B_SCL)|(1<<B_SDA)|(1<<B_KEY)
 
-C_I2CBusOut     equ     (1<<B_ROW2)
+C_I2CBusOut     equ     (1<<B_KEY)
 
 P5_IO_Init      equ     0b00000000;
 P5_R_Init       equ     0b00000100;

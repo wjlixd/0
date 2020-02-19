@@ -12,63 +12,60 @@ F_16ms              equ      7       ;
 F_32ms              equ      F_AddrMarried
 ;****************************************************
 ;TRFlagReg         
-    F_DisSlepLed    equ      6      ; 0 - 睡眠时LED来，  1 -睡眠时LED亮
-    F_DisSetNode    equ      5      ; 0 - 允许设置节点，   1 - 不允许设置节点。 如果上游节点设置过我的节点，则不再允许我设置其它节点
+    F_Relay         equ      7      ; 继电器当前状态
 
     F_QuitTime32ms  equ      4      ; 0 - QuitTime每500ms减1， 1-QuitTime 每32ms减1
     F_500ms         equ      3      ; 1 - 500ms 时间到，
     F_250ms         equ      2      ; 1 - 250ms 时间到
-    F_EnSlep        equ      1      ; 0 - 允许进入睡眠，1 - 禁止睡眠
-    F_EpTRData      equ      0      ; 0 - 不保存收发数据， 1 - 保存收发数据
 ;****************************************************
+    C_DevAddrBytes    ==    2
+
 	C_QuitTime		==		30
 	C_ChannelSize   ==      4
+    C_SWChannelSize ==      2
 	C_Time2s        ==      64
+	C_StartChannelNumber==  2
+	C_MaxChannelNumber   == 125
+
 ;*******************************************************
 ; eprom 地址分配
-    C_E2Addr_DevAddr            ==   0x00   ; 0x00   7位地址;
-                                            ; 0x01   10位地址
-    C_E2Addr_Sleep              ==   0x01
-    C_E2Addr_Flag               ==   0x02
+    C_E2Addr_DevAddr            ==   0x00           ; 基本参数
+                                ; 0x00   7位地址
+                                ; 0x01   10位地址
+
     C_E2Addr_Config             ==   0x03
 
-    C_E2Addr_TData              ==   0x08   ; 发送数据保存
-    C_E2Addr_RData              ==   0x17   ; 接收数据保存
-
-    C_EpAddr_RxChannel          ==   0x20   ; 接收信道参数,开关，不接收，这个参数无用
-
-    C_E2Addr_MyNode             ==   0x23   ; MyNode
-    C_E2Addr_MaxNode            ==   0x24   ; MaxNode
-    C_E2Addr_TxChannelNums      ==   0x25   ; 发送信道数
-    C_E2Addr_SWNums             ==   0x26   ; 设置开关数
-
-
-    C_EpAddr_TxChannel          ==  0x30            ; 发送信道 40,50,60,70  共保存5组
-                                ; 0x10   正常发射的信道
-                                ; 0x11   数据通道0  地址1
-                                ; 0x12   数据通道0  地址2
-                                ; 0x13   数据通道0  地址3
-                                ; 0x14   数据通道0  地址4
-                                ; 0x15   数据通道0  地址5
-                                ; 0x16   检验和
+    C_EpAddr_RxChannel          ==   0x20           ; 接收信道参数
+                                ; 0x20    RX addr1
+                                ; 0x21    RX addr2
+                                ; 0x22    RX addr3
+    C_E2Addr_MyNode             ==   0x23   ;    我的节点号, 接收信道 CH
+    C_E2Addr_RxChannelNums      ==   0x24   ;    接收信道数
+    C_E2Addr_TxChannelNums      ==   0x25   ;    发送信道数
+    C_E2Addr_SwNodeNums         ==   0x26
 
 
+    C_EpAddr_TxChannel          ==  0x30   ; 30,40,50,60,70      向下游发送信道
+                                ; 0x30   信道码1
+                                ; 0x31   信道码2
+                                ; 0x32   信道码3
+                                ; 0x33   CH
+                                ; 0x34   
+                                ; 0x35   
+                                ; 0x36   
+
+    C_EpAddr_SWNodeKey         ==  0x38
+
+    C_MaxTxChannelNum          ==   10  ; 最大发送信道数
+    C_MaxSWNum                 ==   10
 
 ;IntKeyValue
-;   0B X000 XX00
-;       | |   ++-------------键值
-;       +-+------------------扫描码 
-   	B_KeyDown		==		7			; 按键按下100ms后置1
-	B_KeyUp			==		3			; 按键弹起100ms后置1
-	B_KeyDown3s		==		2			; 按键按下3秒后置1
+;   B_Key           ==      6
+	B_KeyDown		==		4			; 按键按下100ms后置1
+	B_KeyUp			==		5			; 按键弹起100ms后置1
+	B_KeyDown3s		==		7			; 按键按下3秒后置1
 
-	C_ScanCodeMask  ==      0x70
-    C_KeyValueMask  ==      0x03
-
-    C_KeyFlagMask   ==      (1<<B_KeyDown)  | (1<<B_KeyDown3s)
-
-    C_KeyValueSW    ==      1
-    C_KeyValueRst   ==      3
+    C_KeyFlagMask   ==      (1<<B_KeyDown)  | (1<<B_KeyDown3s)    
 
     C_RFType        ==     01
     C_RFReturn      ==     02
@@ -77,15 +74,3 @@ F_32ms              equ      F_AddrMarried
     C_SWType        ==     05
     C_SWTypeReturn  ==     06
     C_KeyNodeType   ==     07
-
-
-    C_MaxChannel    ==     10            ;  TX, RX 相同
-    C_MaxCH         ==     125           ; nRF24L01,共125个信道
-    C_MaxSWNum      ==     20            ; SWNum 复位后，在设置时不保存，始终为 0，SW可以无限制设置
-; SWNum 是一个开关，只允许设置10个控制终端
-; TxChannel 是下一级
-
-
-;EpNum
-    F_TFail        ==      7
-    F_RFail        ==      6

@@ -2025,7 +2025,6 @@ ClrRam  macro
 	DJZ		Prgtmp1
 	JMP		$-3
 	CLR		RamSelReg
-	INC     KeyCounter			; 保证复位后，正确设置 KeyUp标志
 endm 
 
 M_ClrBankRam  macro

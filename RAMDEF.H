@@ -28,29 +28,33 @@ TRMode              equ     KeyCounter	    +1  ;
 IntKeyValue	    	equ     TRMode          +1
 QuitTime            equ     IntKeyValue	    +1  ; 
 ChannelNums         equ     QuitTime        +1
-EpNum               equ     ChannelNums     +1
+SetMode             equ     ChannelNums     +1  ;       ;  1F
 ;************************************************************
-DataBuf             equ     0x29
+DataBuf             equ     SetMode         +1  ;       ;  1F
+
 DataBufEnd          equ     0x2F
 
 RF_Data             equ     DataBuf
 ;************************************************************
-; 发送信息
-RF_MaxNode          ==      RF_Data      +   3
-SW_Node             ==      RF_Data      +   4
-SW_KeyValue         ==      RF_Data      +   5
-;RF_InfoType        ==      RF_Data      +   6
+; SWInfo 定义
+SW_InfoNum          ==      RF_Data             ; 信息序号
+SW_KeyValue         ==      RF_Data      +   1
+SW_Node             ==      RF_Data      +   2
+SW_Bit              ==      RF_Data      +   3
 ;************************************************************
-; 设置节点
-;RF_MaxNode         ==      RF_Data      +   3
+; 设置节点定义
+RF_MaxNode          ==      RF_Data
 RF_InfoType         ==      RF_Data      +   6
 ;************************************************************
-; 设置开关信息
-RF_MyNode           ==      RF_Data
-RF_KeyValue         ==      RF_Data      +   1
-;RF_InfoType        ==      RF_Data      +   6
+KeyValue            ==      RF_Data      +   5
+
 ;************************************************************
-ErrorCnt            ==      StepBak         ; 开关按键发送信息错误计数
+; channelnums    ; 我的接收信道号
+RF_InfoSN           ==      RF_Data     +   2
+RF_MyNode           ==      RF_Data     +   3
+RF_SWNode           ==      RF_Data     +   4
+RF_SWKey            ==      RF_Data     +   5
+
 
 Buf_RamAddr         ==      PrgTmp5
 Buf_RamSize         ==      PrgTmp6
@@ -61,5 +65,4 @@ Ep_Mode             ==      DevAddrByte  + 1
 InfoSN              ==      I2CStep         ; 全程变量，不能共用
 
 ; idle 接收使用RAM     SetMode -- 记录按键次数, SPI_Mode -- SPI收发参数
-SetMode             ==      DataPtr
-MyNode              ==      DataPtr
+MyNode              ==      SetMode
