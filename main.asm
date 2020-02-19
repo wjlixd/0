@@ -1,5 +1,5 @@
 ;    RF24L01    发送端模块  
-;    2020.01,   chksum: 9258
+;    2020.02,19,   chksum: 9197,睡眠前设置24L01 掉电模式
 
 include	"option.h"
 if MCU == 0
@@ -410,6 +410,11 @@ ChkSlep:
     JMP     main
     JBS     TRFlagReg,F_EnSlep
     JMP     main
+
+    BC      P_CE,B_CE
+    MOV     A,@0x00                 ; 掉电模式
+    CALL    SetSPI_CONFIG
+
 ;//MARK: Slep睡眠 
     MOV     A,@P6_IO_Slep
     IOW     Port6
@@ -417,6 +422,10 @@ ChkSlep:
     M_Sleep
     MOV     A,@P6_IO_Init
     IOW     Port6   
+
+    MOV     A,@0x3F                 ; 待机1模式
+    CALL    SetSPI_CONFIG
+
     JMP     QuitToIdle    
 ;******************************************************** 
 ;//TODO: SetEp 设置EP地址
