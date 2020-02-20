@@ -17,6 +17,9 @@ F_32ms              equ      F_AddrMarried
     F_QuitTime32ms  equ      4      ; 0 - QuitTime每500ms减1， 1-QuitTime 每32ms减1
     F_500ms         equ      3      ; 1 - 500ms 时间到，
     F_250ms         equ      2      ; 1 - 250ms 时间到
+
+    F_NumsInc       equ      0
+    F_FindSame      equ      0
 ;****************************************************
     C_DevAddrBytes    ==    2
 
@@ -74,3 +77,8 @@ F_32ms              equ      F_AddrMarried
     C_SWType        ==     05
     C_SWTypeReturn  ==     06
     C_KeyNodeType   ==     07
+
+;设置数据类型，由SetMode确定 存储EP地址
+    C_ConfigNode    ==     0
+    C_ConfigSWInfo  ==     1
+    C_ConfigTxCode  ==     2

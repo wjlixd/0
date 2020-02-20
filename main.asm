@@ -423,7 +423,7 @@ NextSWInfo:
     JBC     StatusReg,ZeroFlag
     JMP     ChkSWNode               ; 没设置过，不能转发
 
-    CALL    SetEpParam_TxChannelNums
+    CALL    SetEpParam_ChannelNums
     MOV     A,@C_ReadEp_Trans       ; 1 - 保存上游接收码
     JMP     PresetReadEp
 
@@ -454,6 +454,9 @@ _NextSWNums:
     JMP     NextSWInfo
 ;************************************************
 ChkSWNode:
+    MOV     A,@C_ConfigSWInfo
+    MOV     SetMode,A               ; 设置从设置参数中读 SW Info
+
     MOV     A,@C_E2Addr_SwNodeNums
     CALL    SetEp_ChannelNums
     MOV     A,@C_ReadEp_SWNodeNums
@@ -464,7 +467,7 @@ _ChkNextSWNum:
     JBC     StatusReg,ZeroFlag
     JMP     PresetRxTrans           ; 所有SW节点检查完成
 
-    CALL    SetEpParam_SWNodeKey    ; 从节点，键值表读 2节点
+    CALL    SetEpParam_ChannelNums  ; 从节点，键值表读 2节点
     MOV     A,@C_ReadEp_SWCode2B
     JMP     PresetReadEp
 
@@ -496,23 +499,24 @@ _NextSWNodeKey:
     DEC     ChannelNums
     JMP     _ChkNextSWNum     
 ;************************************************
-;//TODO: SetEp 地址 - 2B
-SetEp_DevAddr:                       ; 设备EPROM参数， 24C02
-    MOV     A,@C_E2Addr_DevAddr
-    JMP     $+3
-
-SetEpParam_SWNodeKey:
+SetEpParam_ChannelNums:
     SWAPA   ChannelNums
-    ADD     A,@C_EpAddr_SWNodeKey-0x10
+    MOV     Buf_EpAddr,A      
+         ; 
+    MOV     A,SetMode
+    XOR     A,@C_ConfigSWInfo
+    JBS     StatusReg,ZeroFlag
+    JMP     $+5     
 
-    MOV     Buf_EpAddr,A           ; 
+    MOV     A,@C_EpAddr_SWNodeKey-0x10
+    ADD     Buf_EpAddr,A           ; 
     MOV     A,@C_SWChannelSize      ; 2个字节
     JMP     SetEpParamCh0+2
-;************************************************
-;  根据 ChannelNums 设置 Ep TxChannel code 地址 - 4B
-SetEpParam_TxChannelNums:
-    SWAPA   ChannelNums
-    ADD     A,@C_EpAddr_TxChannel-0x10
+
+    MOV     A,@C_EpAddr_TxChannel-0x10
+    ADD     Buf_EpAddr,A           ; 
+    JMP     SetEpParamCh0+1
+
 ;TODO: SetEpParamCh0
 SetEpParamCh0:
     MOV     Buf_EpAddr,A        ; 
@@ -589,7 +593,7 @@ ConfigRcv_RxChannel:                ; 设置发送方地址，需要填充地址码，信道
 
     INC     ChannelNums             ; ChannelNums + 1,保存代码
 
-    CALL    SetEpParam_TxChannelNums
+    CALL    SetEpParam_ChannelNums
     MOV     A,@C_SaveEp_UpCode      ; 1 - 保存上游接收码
     JMP     PresetSaveEp
 ;************************************************
@@ -607,15 +611,34 @@ ConfigRcv_SetSW:                    ; 设置开关信息
 ;保存参数
 ConfigRcv_SaveSW:                   ; 设置开关信息，保存开关信息
     INC     ChannelNums
-    CALL    SetEpParam_SWNodeKey
+    CALL    SetEpParam_ChannelNums
     MOV     A,@C_SaveEp_SWNodeKey   ; 2 - 保存开关信息2B
     JMP     PresetSaveEp
 
 ConfigRcv_SaveMyNode:
     MOV     A,RF_MyNode
     MOV     ChannelNums,A
+    JMP     ConfigRcv_NumsChange    ; ChannelNums 改了，去保存
 
-ConfigRcv_SaveTxChannelNums:        ; 保存 Tx ChannelNums       
+ConfigRcv_SaveTxChannelNums:        ; ChannelNums 加1了，检查有没有重复，如果有重复，再不保存，成功返回
+    DECA    ChannelNums
+    JBC     StatusReg,ZeroFlag
+    JMP     ConfigRcv_NumsChange    ; ChannelNum =1 ,直接保存，无重复
+
+    CALL    SetEpParam_ChannelNums
+    MOV     A,@C_ReadEp_TxCodeSwInfo; 把新保存的数据读到 RF_Data缓冲中,待比较
+    JMP     PresetReadEp
+
+ConfigRcv_ChkDataRecover:
+    MOV     A,ChannelNums
+    MOV     RF_InfoType,A           ; ChannelNums暂时保存
+
+    DEC     ChannelNums             ; 把最新一组与以前组比较
+    CALL    SetEpParam_ChannelNums
+
+
+
+ConfigRcv_NumsChange:
     CALL    _ChannelNum_EpTable
     CALL    SetEp_ChannelNums
     MOV     A,@C_SaveEp_ChannelNums
@@ -749,13 +772,14 @@ _RxDownCodeEnd:
     JMP     PresetRxTrans_LedOff                ; 类型错，重来
 
     INC     ChannelNums
-    CALL    SetEpParam_TxChannelNums
+    CALL    SetEpParam_ChannelNums
     MOV     A,@C_SaveEp_DownCode        ; 3 - 保存下游接收码
     JMP     PresetSaveEp
 
 _RxDownCodeSaveNum:
-    MOV     A,@C_E2Addr_TxChannelNums
-    JMP     ConfigRcv_SaveTxChannelNums+1
+    MOV     A,@4
+    MOV     SetMode,A  
+    JMP     ConfigRcv_SaveTxChannelNums ; 去处理 TxNums+1,检查重复，保存 ChannelNums
 ;************************************************
 ;//MARK:ResetSystemParam
 ; IDLE模式，长按3秒， 清除系统参数
@@ -862,6 +886,30 @@ ReadEpromData:
     DJZA    QuitTime
     JMP     main   
     JMP     _ReadFailTable
+;*************************************************
+;//MARK: 读EPROM进程
+PresetCompEp:
+    MOV     Ep_Mode,A
+    MOV     A,@C_CompEpromData
+    MOV     TRMode,A
+    CALL    SetWriteEpWaitTime
+CompEpromData:
+    MOV     A,Buf_EpAddr
+    MOV     PrgTmp2,A
+    MOV     A,Buf_RamAddr
+    MOV     RamSelReg,A
+    MOV     A,Buf_RamSize
+    MOV     PrgTmp1,A
+    CALL    I2C_CompPageData
+    JBS     StatusReg,CarryFlag
+    JMP     _CompareEnd                         ; EPROM 正常，灯不闪
+
+    DJZA    QuitTime
+    JMP     main   
+    JMP     _ReadFailTable
+
+_CompareEnd:                                    ; 一组数据比较结束
+
 ;***************************************************
 ;//TODO: McuReset
 McuReset:
