@@ -8,7 +8,8 @@ BlockNum=0
 [EEPROMBlock]
 BlockNum=0
 [BREAKPOINT]
-BP Num=0
+BP Num=1
+BP0=1,A,1242244,1,63621804,505,$\main.asm
 [CODEOPTION]
 Option Num=9
 Target Power=1

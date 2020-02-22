@@ -686,6 +686,9 @@ _RxCode4B:
     CALL    SetSPI_FLUSH_RX         ; 清除SPI接收缓冲区
     BS      P_CE,B_CE      
 
+    JBS     TRFlagReg,F_Config
+    JMP     ResetKeyCnt
+
     MOV     A,@C_WaitRxDataReturn
     MOV     TRMode,A
     CALL    _RxWaitTimeTable        ; 设置接收等待时间

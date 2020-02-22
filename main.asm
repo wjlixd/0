@@ -20,7 +20,7 @@ _EpAddrTable:
     RETL    @C_EpAddr_SWNodeKey-0x10
     RETL    C_EpAddr_TxChannel-0x10
 
- _EpSizeTable:
+_EpSizeTable:
      MOV     A,SetMode
      ADD     PC,A
      RETL    @2
@@ -145,33 +145,30 @@ TimeSpaceRcv:
     C_ReadEp_RxChannel      ==  01  ;OK
     C_ReadEp_RxCode4B       ==  02  ;ok
     C_READEP_TxChananeNums  ==  03  ;ok  读 Tx ChannelNums准备转发
-    C_ReadEp_Trans          ==  04  ;ok 读第N组发送码 -4B
-    C_ReadEp_MyNode         ==  05  ;ok 转发填充我的节点
-    C_ReadEp_SWNodeNums     ==  06  ;ok
-    C_ReadEp_SWCode2B       ==  07  ;OK
-    C_ReadEp_Cfg_RxChannel  ==  08  ;
-    C_ReadEp_TxCode4B       ==  09
-    C_ReadEp_TxCodeSwInfo   ==  10  ;
-    C_ReadEp_Sleep          ==  11
-    C_ReadEp_RelaySWAddr    ==  12
+    C_ReadEp_MyNode         ==  04  ;ok 转发填充我的节点
+    C_ReadEp_SWNodeNums     ==  05  ;ok
+    C_ReadEp_SWCode2B       ==  06  ;OK
+    C_ReadEp_Cfg_RxChannel  ==  07  ;
+    C_ReadEp_TxCode4B       ==  08
+    C_ReadEp_TxCodeSwInfo   ==  09  ;
+    C_ReadEp_Sleep          ==  10
+    C_ReadEp_RelaySWAddr    ==  11
 
 _ReadSucessTable:
     MOV     A,Ep_Mode
     ADD     PC,A
-    JMP     _ReadChannelNumsOk      ;0
-    JMP     _TxMyNode_ReadEp        ;1 C_ReadEp_RxChannel      ==  02
-    JMP     _RxCode4B               ;2 C_ReadEp_RxCode4B       ==  03
-    JMP     NextSWInfo              ;3 C_READEP_TxChananeNums 读转发NUMS
-    JMP     _RcvTrans_GetCode       ;4 C_ReadEp_Trans          ==  05  ; 读第N组发送码 -4B
-    JMP     _RcvTrans_MyNode        ;5 填充我的节点
-    JMP     _ChkNextSWNum           ;6 
-    JMP     _RcvTrans_SW2B          ;7 读SW CODE 2B
-
-    JMP     ConfigRcv_SetSW         ;8 
-    JMP     _TxCode4B               ;9
-    JMP     ConfigRcv_ChkDataRecover;10
-    JMP     _McuReset_Sleep         ;11
-    JMP     _RelaySWAddr            ;12
+    JMP     _ReadChannelNumsOk      ;00   
+    JMP     _TxMyNode_ReadEp        ;01   C_ReadEp_RxChannel      ==  02
+    JMP     _RxCode4B               ;02   C_ReadEp_RxCode4B       ==  03
+    JMP     NextSWInfo              ;03   C_READEP_TxChananeNums 读转发NUMS
+    JMP     _RcvTrans_MyNode        ;04   填充我的节点
+    JMP     _ChkNextSWNum           ;05   
+    JMP     _RcvTrans_SW2B          ;06   读SW CODE 2B
+    JMP     ConfigRcv_SetSW         ;07
+    JMP     _TxCode4B               ;08
+    JMP     ConfigRcv_ChkDataRecover;09
+    JMP     _McuReset_Sleep         ;10
+    JMP     _RelaySWAddr            ;11
 ;*************************************************
 ;//MARK: 读EPROM失败列表
 ; _ReadFailTable:
@@ -401,6 +398,7 @@ _IdleChkKeyUp:
     JBS     StatusReg,CarryFlag
     JMP     ResetKeyCnt
 
+    BS      TRFlagReg,F_Config
     DEC     SetMode
     CALL    _ChannelNum_EpTable
     CALL    SetEp_ChannelNums
@@ -446,21 +444,15 @@ NextSWInfo:
     JBC     StatusReg,ZeroFlag
     JMP     ChkSWNode               ; 没设置过，不能转发
 
-    CALL    SetEpParam_ChannelNums
-    MOV     A,@C_ReadEp_Trans       ; 1 - 保存上游接收码
-    JMP     PresetReadEp
+    MOV     A,@C_TxData_Trans
+    JMP     PresetTxNums
 
-_RcvTrans_GetCode:
+_RcvTrans_SetData:
     MOV     A,MyNode                ; 上游节点
     XOR     A,RF_MyNode             ; 下游节点
     JBC     StatusReg,ZeroFlag
     JMP     _NextSWNums             ; 不向上游发送
 
-    MOV     A,@C_TxData_Trans
-    MOV     SPI_Mode,A
-    JMP     _TxCode4B               ; 设置信道
-
-_RcvTrans_SetData:
 ; 设置发送数据
     CALL    SetEp_MyNode            ; 把 EP MyNode 读到 RF_Data+3    
     MOV     A,@C_ReadEp_MyNode      ; 1 - 保存上游接收码
@@ -552,6 +544,7 @@ _RelaySWAddr:
     JMP     PresetSaveEp
 
 ;************************************************
+; 根据 ChannelNums 设置  I2CADDR /TX CODE/ SW CODE /
 SetEpParam_ChannelNums:
     SWAPA   ChannelNums
     MOV     Buf_EpAddr,A      
@@ -883,6 +876,8 @@ WaitTimeOver_NoLed:                 ; 等待超时,LED状态不变
 PresetRxTrans:
     MOV     A,@0xA0
     MOV     I2CAddr,A
+
+    BC      TRFlagReg,F_Config
 
     CLR     TRMode
     CLR     SetMode                 ;  = InfoSN 

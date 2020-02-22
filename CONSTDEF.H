@@ -11,7 +11,7 @@ F_WDevAddr          equ      6
 ;****************************************************
 ;TRFlagReg         
     F_16ms          equ      7      ; 
-    F_Relay         equ      6      ; 继电器当前状态
+    F_Config        equ      6      ; 继电器当前状态
 
     F_QuitTime32ms  equ      4      ; 0 - QuitTime每500ms减1， 1-QuitTime 每32ms减1
     F_500ms         equ      3      ; 1 - 500ms 时间到，
