@@ -8,17 +8,15 @@ F_DataValid         equ      3       ; I2C 总线正常结束
 ; SlaverSDA       equ     4
 ; SlaverSCL       equ     5
 F_WDevAddr          equ      6
-F_16ms              equ      7       ; 
-F_32ms              equ      F_AddrMarried
 ;****************************************************
 ;TRFlagReg         
-    F_Relay         equ      7      ; 继电器当前状态
+    F_16ms          equ      7      ; 
+    F_Relay         equ      6      ; 继电器当前状态
 
     F_QuitTime32ms  equ      4      ; 0 - QuitTime每500ms减1， 1-QuitTime 每32ms减1
     F_500ms         equ      3      ; 1 - 500ms 时间到，
     F_250ms         equ      2      ; 1 - 250ms 时间到
-
-    F_NumsInc       equ      0
+    F_EpTRData      equ      1      ; 0 - 不保存收发数据， 1 - 保存收发数据
     F_FindSame      equ      0
 ;****************************************************
     C_DevAddrBytes    ==    2
@@ -35,9 +33,10 @@ F_32ms              equ      F_AddrMarried
     C_E2Addr_DevAddr            ==   0x00           ; 基本参数
                                 ; 0x00   7位地址
                                 ; 0x01   10位地址
-
+;  地址 02 ，设置是否保存测试数据    
     C_E2Addr_Config             ==   0x03
-
+    C_E2Addr_TData              ==   0x08   ; 发送数据保存
+    C_E2Addr_RData              ==   0x17   ; 接收数据保存
     C_EpAddr_RxChannel          ==   0x20           ; 接收信道参数
                                 ; 0x20    RX addr1
                                 ; 0x21    RX addr2
@@ -58,6 +57,9 @@ F_32ms              equ      F_AddrMarried
                                 ; 0x36   
 
     C_EpAddr_SWNodeKey         ==  0x38
+
+    C_EpAddr_SWI2c             ==  0x3B
+
 
     C_MaxTxChannelNum          ==   10  ; 最大发送信道数
     C_MaxSWNum                 ==   10
@@ -82,3 +84,7 @@ F_32ms              equ      F_AddrMarried
     C_ConfigNode    ==     0
     C_ConfigSWInfo  ==     1
     C_ConfigTxCode  ==     2
+
+;EpNum
+    F_TFail        ==      7
+    F_RFail        ==      6

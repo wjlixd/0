@@ -1,15 +1,9 @@
 ; RF24L01无线收发模块 , 接收端 2020.02.11, 
 ;   153  chksum: otp: 2A5D-4M   , 2A87-8M
 include	"option.h"
-if MCU == 0
 include	"ConstDef.h"
 include "public.h"
 include	"PortDef.h"
-else
-include	"F734_ConstDef.h"
-include "F734_public.h"
-include	"F734_PortDef.h"
-endif
 include	"RamDef.h"
 include	"Mini4X8LED.H"
 include "macro.h"
@@ -26,6 +20,30 @@ endm
 
     ORG     0
     JMP     McuReset
+_EpAddrTable:
+    MOV     A,SetMode
+    ADD     PC,A
+    RETL    @C_EpAddr_SWI2c-0x10
+    RETL    @C_EpAddr_SWNodeKey-0x10
+    RETL    C_EpAddr_TxChannel-0x10
+
+; _EpSizeTable:
+;     MOV     A,SetMode
+;     ADD     PC,A
+;     RETL    @1
+;     RETL    @2
+;     RETL    @4
+
+_BitTable:
+    ADD     PC,A
+    RETL    @1<<0
+    RETL    @1<<1
+    RETL    @1<<2
+    RETL    @1<<3
+    RETL    @1<<4
+    RETL    @1<<5
+    RETL    @1<<6
+    RETL    @1<<7
 
 _RxChannelTable:
     DECA    SetMode
@@ -104,15 +122,20 @@ _ResetSizeTable:
     C_SaveEp_SWNodeKey  ==      02
     C_SaveEp_ChannelNums==      03
     C_SaveEp_DownCode   ==      04
-
+    C_SaveEp_RData      ==      05
+    C_SaveEp_TData      ==      06
+    C_SaveEp_I2CSW      ==      07
 _SaveSucessTable:
     MOV     A,Ep_Mode
     ADD     PC,A
-    JMP     _ConfirmResetSaveOk
-    JMP     ConfigRcv_RxChannel1    ; 01
-    JMP     ConfigRcv_SaveTxChannelNums;02
-    JMP     FlashSucess             ; 03
-    JMP     _RxDownCodeSaveNum
+    JMP     _ConfirmResetSaveOk             ; 00
+    JMP     ConfigRcv_RxChannel1            ; 01
+    JMP     ConfigRcv_SaveTxChannelNums     ; 02
+    JMP     FlashSucess                     ; 03
+    JMP     _RxDownCodeSaveNum              ; 04
+    JMP     _SetRxData_SaveRData            ; 05
+    JMP     _SetTxData_SaveTData            ; 06
+    JMP     PresetRxTrans                   ; 
 ;*************************************************
 ;//MARK: 写EPROM失败列表
 _SaveFailTable:
@@ -131,6 +154,10 @@ _SaveFailTable:
     C_ReadEp_SWCode2B       ==  07  ;OK
     C_ReadEp_Cfg_RxChannel  ==  08  ;
     C_ReadEp_TxCode4B       ==  09
+    C_ReadEp_TxCodeSwInfo   ==  10  ;
+    C_ReadEp_Sleep          ==  11
+    C_ReadEp_RelaySWAddr    ==  12
+
 _ReadSucessTable:
     MOV     A,Ep_Mode
     ADD     PC,A
@@ -145,7 +172,9 @@ _ReadSucessTable:
 
     JMP     ConfigRcv_SetSW         ;8 
     JMP     _TxCode4B               ;9
-
+    JMP     ConfigRcv_ChkDataRecover;10
+    JMP     _McuReset_Sleep         ;11
+    JMP     _RelaySWAddr            ;12
 ;*************************************************
 ;//MARK: 读EPROM失败列表
 _ReadFailTable:
@@ -189,16 +218,12 @@ _TxFailTable:
     JMP     PresetRxTrans_LedOff
     JMP     PresetRxTrans_LedOff
 ;*************************************************
-;//MARK: 接收数据 - 列表 
-;
-    C_RxData_Trans      ==  0       ; 接收转发
-    C_RxData_Config     ==  1       ; 接收设置信息
-    C_Tx2Rx_Code4B      ==  2
-
-;//MARK: 设置时间
+;//MARK: Time 设置时间
     ; ms 按键弹起计数按键数等待时间 1秒
     ; 保存EProm等待时间           1秒
     ; 读  EProm等待时间           1秒
+    C_WaitEpTime    ==      10
+
     C_KeyUpTime     ==      30  ; ms    
 
     ; SPI 发送数据等待时间， 320ms 
@@ -210,6 +235,11 @@ _TxFailTable:
     ; 操作成功，闪LED时间 3秒
     C_FlashSucessTime==     6   ; 0.5s
 
+;//MARK: 接收数据 - 列表 
+;
+    C_RxData_Trans      ==  0       ; 接收转发
+    C_RxData_Config     ==  1       ; 接收设置信息
+    C_Tx2Rx_Code4B      ==  2
 ; 接收码表
 _RxCodeAddrTable:                   
     ADD     PC,A
@@ -311,34 +341,27 @@ main:
     C_ReadEpromData     ==  5
     C_WaitTxDataEnd     ==  6
     C_WaitRxDataReturn  ==  7 
-
+    C_CompEpromData     ==  8
+    C_WaitRx2TxEnd      ==  9
 ;//TODO: main
 _mainTable:    
     MOV     A,TRMode
     ADD     PC,A
-    JMP     IdleModeCode
-    JMP     ConfirmReset
-    JMP     WaitBlinkEnd            ; 
-    JMP     TxData                  ; 10 按一次键，发送我的节点信息
-    JMP     SaveEpromData
-    JMP     ReadEpromData
-    JMP     WaitTxDataEnd           ; 11 发送完成，转为接收模式
-    JMP     WaitRxDataReturn
-
+    JMP     IdleModeCode            ;0
+    JMP     ConfirmReset            ;1
+    JMP     WaitBlinkEnd            ;2 
+    JMP     TxData                  ;3  按一次键，发送我的节点信息
+    JMP     SaveEpromData           ;4
+    JMP     ReadEpromData           ;5
+    JMP     WaitTxDataEnd           ;6  发送完成，转为接收模式
+    JMP     WaitRxDataReturn        ;7
+    JMP     CompEpromData           ;8
+    JMP     WaitRx2TxEnd            ;9
 ; 转发结束，比较节点是否与我的节点信息，相同，如果2字节相同，则继电器动作
 
     C_MaxMode   ==   $-_mainTable-2
 ;    M_I2CMaster201911
 include "com.asm"
-;******************************************
-;//TODO: ReadSpiData - ; 从SPI缓冲区读数据 
-ReadSpiData:
-    BC      P_CE,B_CE               ; 读数据
-    CALL    SetSPIDataParam
-
-    MOV     A,@RD_RX_PLOAD
-    JMP     SPI_Read_Buf
-
 ;******************************************
 IdleModeCode_LedOff:
     CLR     TRMode
@@ -477,46 +500,71 @@ _RcvTrans_SW2B:
     JBS     StatusReg,ZeroFlag
     JMP     _NextSWNodeKey
 
-    MOV     A,RF_Data+1             ; 从节点，键值表读的节点
-    XOR     A,RF_SWNode+1           ; 与收到的信息，节点号比较
-    JBS     StatusReg,ZeroFlag
-    JMP     _NextSWNodeKey
-
-; 节点相同， 继电器操作取反             
-    MOV     A,@1<<F_Relay
-    XOR     TRFlagReg,A
-    JBS     TRFlagReg,F_Relay       ; 如果继电器动作，LED显示继电器状态
-    JMP     $+4
-
-    BS      P_Relay,B_Relay
-    BS      P_LED,B_LED
-    JMP     $+3
-
-    BC      P_Relay,B_Relay
-    BC      P_LED,B_LED
+    MOV     A,RF_Data+1
+    XOR     A,RF_SWNode+1
+    JBC     StatusReg,ZeroFlag    
+    JMP     _RelayChange
 
 _NextSWNodeKey:
     DEC     ChannelNums
     JMP     _ChkNextSWNum     
 ;************************************************
+;//MARK: RelayChange
+_RelayChange:
+    MOV     A,RF_Data+1
+    AND     A,@7
+    MOV     ChannelNums,A           ; ChannelNums = RF_Data+1
+    CALL    _BitTable
+    XOR     RelayStatus,A
+    AND     A,RelayStatus
+    BC      P_LED,B_LED
+    JBS     StatusReg,ZeroFlag
+    BS      P_LED,B_LED
+
+    MOV     A,RF_Data+1
+    JBS     StatusReg,ZeroFlag
+    JMP     $+6
+;RF_Data = 0, 设置本地继电器
+    JBS     RelayStatus,0
+    BC      P_Relay,B_Relay
+    JBC     RelayStatus,0
+    BS      P_Relay,B_Relay
+    JMP     PresetRxTrans
+
+    CLR     SetMode                 ; 准备读 SW I2C地址
+    CALL    SetEpParam_ChannelNums
+    MOV     A,@C_ReadEp_RelaySWAddr
+    JMP     PresetReadEp
+_RelaySWAddr:
+    MOV     A,RF_Data
+    MOV     I2CAddr,A
+    MOV     A,@1
+    MOV     RF_Data,A
+
+    MOV     A,ChannelNums
+    CALL    _BitTable
+    AND     A,RelayStatus
+    JBS     StatusReg,ZeroFlag
+    MOV     A,@0xFF
+    MOV     RF_Data+1,A             ; 0 / FF
+
+    INC     Buf_RamSize             ; SIZE = 2, RMASDDR = RF_Data
+    CLR     Buf_EpAddr              ; EP ADDR = 0
+
+    MOV     A,@C_SaveEp_I2CSW
+    JMP     PresetSaveEp
+
+;************************************************
 SetEpParam_ChannelNums:
     SWAPA   ChannelNums
     MOV     Buf_EpAddr,A      
-         ; 
-    MOV     A,SetMode
-    XOR     A,@C_ConfigSWInfo
-    JBS     StatusReg,ZeroFlag
-    JMP     $+5     
 
-    MOV     A,@C_EpAddr_SWNodeKey-0x10
-    ADD     Buf_EpAddr,A           ; 
-    MOV     A,@C_SWChannelSize      ; 2个字节
+    CALL    _EpAddrTable
+    ADD     Buf_EpAddr,A   
+;_EpSizeTable
+    BC      StatusReg,CarryFlag
+    RLCA    SetMode
     JMP     SetEpParamCh0+2
-
-    MOV     A,@C_EpAddr_TxChannel-0x10
-    ADD     Buf_EpAddr,A           ; 
-    JMP     SetEpParamCh0+1
-
 ;TODO: SetEpParamCh0
 SetEpParamCh0:
     MOV     Buf_EpAddr,A        ; 
@@ -541,7 +589,20 @@ SetEp_ChannelNums:
     MOV     A,@1                        ; +3
     MOV     Buf_RamSize,A
     RET
+;************************************************
+SetEp_RData:
+    MOV     A,@C_E2Addr_RData
+    JMP     SetEp_TData+1
+SetEp_TData:
+    MOV     A,@C_E2Addr_TData
+    MOV     Buf_EpAddr,A
 
+    MOV     A,@PLOAD_WIDTH_SET+1    ; 8
+    MOV     Buf_RamSize,A           ;+2
+    MOV     A,@EpNum
+    MOV     Buf_RamAddr,A
+    INC     EpNum
+    RET
 ;************************************************
 ; 设置 Tmp1,RamSelReg 设置读写 SPI 寄存器 3B ，7B
 SetTRAddrParam:
@@ -621,9 +682,10 @@ ConfigRcv_SaveMyNode:
     JMP     ConfigRcv_NumsChange    ; ChannelNums 改了，去保存
 
 ConfigRcv_SaveTxChannelNums:        ; ChannelNums 加1了，检查有没有重复，如果有重复，再不保存，成功返回
-    DECA    ChannelNums
-    JBC     StatusReg,ZeroFlag
-    JMP     ConfigRcv_NumsChange    ; ChannelNum =1 ,直接保存，无重复
+    MOV     A,@2
+    SUB     A,ChannelNums
+    JBS     StatusReg,CarryFlag
+    JMP     ConfigRcv_NumsChange    ; ChannelNums <2 ,直接保存，无重复
 
     CALL    SetEpParam_ChannelNums
     MOV     A,@C_ReadEp_TxCodeSwInfo; 把新保存的数据读到 RF_Data缓冲中,待比较
@@ -634,9 +696,39 @@ ConfigRcv_ChkDataRecover:
     MOV     RF_InfoType,A           ; ChannelNums暂时保存
 
     DEC     ChannelNums             ; 把最新一组与以前组比较
+    BC      TRFlagReg,F_FindSame    ;
+_CompareNext:
     CALL    SetEpParam_ChannelNums
+;    JMP     PresetCompEp
+;//MARK: EPROM 比较数据进程
+PresetCompEp:
+    MOV     A,@C_CompEpromData
+    MOV     TRMode,A
+    CALL    SetWriteEpWaitTime
+CompEpromData:
+    MOV     A,Buf_EpAddr
+    MOV     PrgTmp2,A
+    MOV     A,Buf_RamAddr
+    MOV     RamSelReg,A
+    MOV     A,Buf_RamSize
+    MOV     PrgTmp1,A
+    CALL    I2C_CompPageData
+    JBS     StatusReg,CarryFlag
+    JMP     _CompareEnd                         ; EPROM 正常，灯不闪
 
+    DJZA    QuitTime
+    JMP     main   
+    JMP     _ReadFailTable
 
+_CompareEnd:                                    ; 一组数据比较结束
+    JBC     TRFlagReg,F_FindSame
+    JMP     FlashSucess                         ; 发现有相同的，不保存 Nums,Nums不变化
+
+    DJZ     ChannelNums
+    JMP     _CompareNext
+
+    MOV     A,RF_InfoType
+    MOV     ChannelNums,A                       ; 恢复暂时的ChannelNums，进行保存
 
 ConfigRcv_NumsChange:
     CALL    _ChannelNum_EpTable
@@ -644,95 +736,95 @@ ConfigRcv_NumsChange:
     MOV     A,@C_SaveEp_ChannelNums
     JMP     PresetSaveEp
 
-;************************************************
-PresetRx2Tx:
-    MOV     SPI_Mode,A
-    JMP     _TxCode4B+1
-;//MARK: 发送数据进程
-; 【A】 - 发送码，I2C 地址
-PresetTxData:
-    MOV     SPI_Mode,A
-    CALL    _TxCodeAddrTable
-    CALL    SetEpParamCh0
-    MOV     A,@C_ReadEp_TxCode4B
-    JMP     PresetReadEp
+; ;************************************************
+; PresetRx2Tx:
+;     MOV     SPI_Mode,A
+;     JMP     _TxCode4B+1
+; ;//MARK: 发送数据进程
+; ; 【A】 - 发送码，I2C 地址
+; PresetTxData:
+;     MOV     SPI_Mode,A
+;     CALL    _TxCodeAddrTable
+;     CALL    SetEpParamCh0
+;     MOV     A,@C_ReadEp_TxCode4B
+;     JMP     PresetReadEp
 
-_TxCode4B:
-    CALL    BufferInitTx
+; _TxCode4B:
+;     CALL    BufferInitTx
 
-    BC      P_CE,B_CE               ; Standby 模式
-    CALL    SetSPI_CLRIRQ
-    MOV     A,@0x4E                 ; 发送/溢出中断，发送模式
-    CALL    SetSPI_CONFIG
-    CALL    SetSPI_FLUSH_TX
+;     BC      P_CE,B_CE               ; Standby 模式
+;     CALL    SetSPI_CLRIRQ
+;     MOV     A,@0x4E                 ; 发送/溢出中断，发送模式
+;     CALL    SetSPI_CONFIG
+;     CALL    SetSPI_FLUSH_TX
 
-    JMP     _SetTxDataTable
+;     JMP     _SetTxDataTable
 
-_SetTxDataEnd:
-    CALL    SetSPIDataParam
-    MOV     A,@WR_TX_PLOAD    
-    CALL    SPI_Write_Buf               ;//装载数据
+; _SetTxDataEnd:
+;     CALL    SetSPIDataParam
+;     MOV     A,@WR_TX_PLOAD    
+;     CALL    SPI_Write_Buf               ;//装载数据
 
-    BS      P_CE,B_CE       
+;     BS      P_CE,B_CE       
 
-    M_LEDON
+;     M_LEDON
 
-    MOV     A,@C_WaitTxDataEnd         ; 超时重发
-    CALL    WaitTxTime_Mode            ; 
-;************************************************
-;// WaitTxDataEnd 等待发送信道码完成，变为接收模式
-WaitTxDataEnd:
-    JBC     P_IRQ,B_IRQ
-    JMP     $+5
+;     MOV     A,@C_WaitTxDataEnd         ; 超时重发
+;     CALL    WaitTxTime_Mode            ; 
+; ;************************************************
+; ;// WaitTxDataEnd 等待发送信道码完成，变为接收模式
+; WaitTxDataEnd:
+;     JBC     P_IRQ,B_IRQ
+;     JMP     $+5
 
-    CALL    SPI_READSTATUS
-    JBC     PrgTmp3,TX_DS
-    JMP     _TxDataEndTable         ; 数据发送成功
-    JMP     _TxFailTable			; 超次数重发
+;     CALL    SPI_READSTATUS
+;     JBC     PrgTmp3,TX_DS
+;     JMP     _TxDataEndTable         ; 数据发送成功
+;     JMP     _TxFailTable			; 超次数重发
 
-    DJZA    QuitTime
-    JMP     main
-    JMP     _TxFailTable			; 超次数重发
-;*************************************
-PresetTx2Rx:
-    MOV     SPI_Mode,A
-    JMP     _RxCode4B+1
-;//MARK: 接收数据进程
-PresetRxData:
-    MOV     SPI_Mode,A
-    CALL    _RxCodeAddrTable
-    CALL    SetEpParamCh0
-    MOV     A,@C_ReadEp_RxCode4B
-    JMP     PresetReadEp
+;     DJZA    QuitTime
+;     JMP     main
+;     JMP     _TxFailTable			; 超次数重发
+; ;*************************************
+; PresetTx2Rx:
+;     MOV     SPI_Mode,A
+;     JMP     _RxCode4B+1
+; ;//MARK: 接收数据进程
+; PresetRxData:
+;     MOV     SPI_Mode,A
+;     CALL    _RxCodeAddrTable
+;     CALL    SetEpParamCh0
+;     MOV     A,@C_ReadEp_RxCode4B
+;     JMP     PresetReadEp
 
-_RxCode4B:
-    CALL    BufferInitTx
+; _RxCode4B:
+;     CALL    BufferInitTx
 
-    BC      P_CE,B_CE
-    CALL    SetSPI_CLRIRQ           ; 清除IRQ中断
-    MOV     A,@0x3F                 ; 接收中断，接收模式
-    CALL    SetSPI_CONFIG
+;     BC      P_CE,B_CE
+;     CALL    SetSPI_CLRIRQ           ; 清除IRQ中断
+;     MOV     A,@0x3F                 ; 接收中断，接收模式
+;     CALL    SetSPI_CONFIG
 
-    CALL    SetSPI_FLUSH_RX
-    BS      P_CE,B_CE      
+;     CALL    SetSPI_FLUSH_RX
+;     BS      P_CE,B_CE      
 
-    MOV     A,@C_WaitRxDataReturn
-    MOV     TRMode,A
-    CALL    _RxWaitTimeTable
-    CALL    SetQuitTime_500ms
-;************************************************
-WaitRxDataReturn:                       ; 等待接收端返回节点数据
-    CALL    LedSlowBlink
-    DECA    QuitTime
-    JBC     StatusReg,ZeroFlag
-    JMP     _RxTimeOverTable
-CheckRxIRQ:
-    JBC     P_IRQ,B_IRQ
-    JMP     main
+;     MOV     A,@C_WaitRxDataReturn
+;     MOV     TRMode,A
+;     CALL    _RxWaitTimeTable
+;     CALL    SetQuitTime_500ms
+; ;************************************************
+; WaitRxDataReturn:                       ; 等待接收端返回节点数据
+;     CALL    LedSlowBlink
+;     DECA    QuitTime
+;     JBC     StatusReg,ZeroFlag
+;     JMP     _RxTimeOverTable
+; CheckRxIRQ:
+;     JBC     P_IRQ,B_IRQ
+;     JMP     main
 
-    CALL    ReadSpiData                 ; 从SPI缓冲区读数据
-    JMP     _RxDataEndTable
-;************************************************
+;     CALL    ReadSpiData                 ; 从SPI缓冲区读数据
+;     JMP     _RxDataEndTable
+; ;************************************************
 ;//MARK: 设置5键，发送我的节点，接收下游节点，并保存
 IdlePress5Key:
     MOV     A,@C_TxData_MyNode  ; 设置 config 通道
@@ -843,84 +935,29 @@ LedQuickBlink:
     XOR     P_LED,A
     RET
 
-;//MARK:    保存EPROM进程
-PresetSaveEp:
-    MOV     Ep_Mode,A
-    MOV     A,@C_SaveEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime
-SaveEpromData:
-    MOV     A,Buf_EpAddr
-    MOV     PrgTmp2,A
-    MOV     A,Buf_RamAddr
-    MOV     RamSelReg,A
-    MOV     A,Buf_RamSize
-    MOV     PrgTmp1,A
-    CALL    I2C_WritePageData
-    JBS     StatusReg,CarryFlag
-    JMP     _SaveSucessTable                    ; EPROM 正常，灯不闪
-
-    CALL    LedQuickBlink                       ; EPROM 正在操作，灯闪最少一次
-    DJZA    QuitTime
-    JMP     main   
-    JMP     _SaveFailTable
-;*************************************************
-;//MARK: 读EPROM进程
-PresetReadEp:
-    MOV     Ep_Mode,A
-    MOV     A,@C_ReadEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime
-ReadEpromData:
-    MOV     A,Buf_EpAddr
-    MOV     PrgTmp2,A
-    MOV     A,Buf_RamAddr
-    MOV     RamSelReg,A
-    MOV     A,Buf_RamSize
-    MOV     PrgTmp1,A
-    CALL    I2C_ReadPageData
-    JBS     StatusReg,CarryFlag
-    JMP     _ReadSucessTable                    ; EPROM 正常，灯不闪
-
-    CALL    LedQuickBlink                       ; EPROM 正在操作，灯闪最少一次
-    DJZA    QuitTime
-    JMP     main   
-    JMP     _ReadFailTable
-;*************************************************
-;//MARK: 读EPROM进程
-PresetCompEp:
-    MOV     Ep_Mode,A
-    MOV     A,@C_CompEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime
-CompEpromData:
-    MOV     A,Buf_EpAddr
-    MOV     PrgTmp2,A
-    MOV     A,Buf_RamAddr
-    MOV     RamSelReg,A
-    MOV     A,Buf_RamSize
-    MOV     PrgTmp1,A
-    CALL    I2C_CompPageData
-    JBS     StatusReg,CarryFlag
-    JMP     _CompareEnd                         ; EPROM 正常，灯不闪
-
-    DJZA    QuitTime
-    JMP     main   
-    JMP     _ReadFailTable
-
-_CompareEnd:                                    ; 一组数据比较结束
-
 ;***************************************************
 ;//TODO: McuReset
 McuReset:
     DISI
     CLRRAM
     InitPort20191229
+
+    MOV     A,@C_E2Addr_DevAddr                   ; 把 Sleep 设置读到 ChannelNums
+    CALL    SetEpParamCh0
+    MOV     A,@C_ReadEp_Sleep
+    JMP     PresetReadEp
+_McuReset_Sleep:
+    JBS     RF_Data+2,1
+    BS      TRFlagReg,F_EpTRData
+
 ; 进入接收开关信息
 PresetRxTrans_LedOff:
     BC      P_LED,B_LED
 ;//MARK:    PresetRxTrans
 PresetRxTrans:
+    MOV     A,@0xA0
+    MOV     I2CAddr,A
+
     CLR     TRMode
     CLR     SetMode                 ;  = InfoSN 
     MOV     A,@1
@@ -934,11 +971,11 @@ PresetRxTrans:
 ;//TODO: SoftTimer
 SoftTimer:
     MOV     A,TCC
-    XOR     A,SystemFlag
+    XOR     A,TRFlagReg
     AND     A,@1<<F_16ms
     JBC     StatusReg,ZeroFlag
     RET
-    XOR     SystemFlag,A
+    XOR     TRFlagReg,A
 
     INC     Cnt16ms
 
@@ -977,7 +1014,6 @@ _Timer250ms:
 
 _Timer32ms:
     XOR     Cnt16msBak,A
-    BS      SystemFlag,F_32ms
 
     DJZA    KeyTime
     MOV     KeyTime,A

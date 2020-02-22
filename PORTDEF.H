@@ -22,8 +22,8 @@ PortPL_Init     equ     0b00000000;
 ;           ------  2  -- VCC
 ;           ------  1  -- GND
 ;*********************************************************
-P_CE            equ     Port51       ; 输出至RF， RX/TX模式选择
-B_CE            equ     Bit51
+; P_CE            equ     Port51       ; 输出至RF， RX/TX模式选择
+; B_CE            equ     Bit51
                                 
 P_CSN           equ     Port52
 B_CSN           equ     Bit52           ; 输出至RF, SPI EN信号
@@ -37,9 +37,17 @@ BO_MOSI         equ     Bit60           ; 输出至RF，向24L01输出数据
 PI_MISO         equ     Port61
 BI_MISO         equ     Bit61           ; 从RF读数据，
                                 
+if EMulater == 0
+P_CE            equ     Port62       ; 输出至RF， RX/TX模式选择
+B_CE            equ     Bit62
+P_IRQ           equ     Port63       ; RF数据完成，产生中断
+B_IRQ           equ     Bit63           
+else
+P_CE            equ     Port51       ; 输出至RF， RX/TX模式选择
+B_CE            equ     Bit51
 P_IRQ           equ     Port62       ; RF数据完成，产生中断
 B_IRQ           equ     Bit62           
-
+endif
 P_SDA           equ     Port64
 B_SDA           equ     Bit64
 

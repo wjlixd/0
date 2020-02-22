@@ -37,7 +37,9 @@ AGENT=0
 [LibraryProject]
 LibraryProject=0
 [LastOpenFiles]
-File Num=0
+File0=$\main.asm
+File1=$\COM.ASM
+File Num=2
 [Source Files]
 File Num=1
 File0=$\main.asm
@@ -108,7 +110,3 @@ Size#1=0
 Size#2=0
 [ICEVOLTAGE SETTING]
 Voltage=1
-[$\PORTDEF.H]
-Rectangle=0022 0022 0678 0433
-Iconized=0
-Maximized=1
