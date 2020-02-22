@@ -299,23 +299,6 @@ SetQuitTime_500ms:
     RET
 
 
-
-;*************************************
-FlashSucess:     ; Eprom保存，LED快闪3秒，返回PresetRxData
-;*************************************
-    MOV     A,@C_WaitBlinkEnd
-    MOV     TRMode,A    
-
-    MOV     A,@C_FlashSucessTime
-    CALL    SetQuitTime_500ms
-;*************************************
-WaitBlinkEnd:
-    CALL    FLed_QuickBlink
-;//MARK: WaitTimeOver
-WaitTimeOver:
-    DJZA    QuitTime
-    JMP     main
-    JMP     PresetRxTrans_LedOff
 ;*************************************
 FLed_SlowBlink:
     MOV     A,@1<<B_LED
@@ -324,12 +307,6 @@ FLed_SlowBlink:
     BC      TRFlagReg,F_500ms
     RET
 
-FLed_QuickBlink:
-    MOV     A,@1<<B_LED
-    JBC     TRFlagReg,F_250ms   ; 快闪
-    XOR     P_LED,A
-    BC      TRFlagReg,F_250ms
-    RET
 
 ChkKeyDown:
     BC      StatusReg,CarryFlag
