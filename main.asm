@@ -744,6 +744,10 @@ _RxDownCodeEnd:
     JBS     StatusReg,ZeroFlag
     JMP     PresetRxTrans_LedOff                ; 类型错，重来
 
+    INCA    RF_MyNode
+    JBC     StatusReg,ZeroFlag
+    JMP     FlashSucess                 ; 节点=FF，不保存
+
     DEC     SetMode                     ; 保存在TX CHANNEL中，SetMode = 3
     INC     ChannelNums
     CALL    SetEpParam_ChannelNums
