@@ -88,3 +88,6 @@ F_WDevAddr          equ      6
 ;EpNum
     F_TFail        ==      7
     F_RFail        ==      6
+
+;ChannelNums:
+    F_NoChange      ==      7   ; ChannelNums 没有改变

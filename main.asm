@@ -14,14 +14,14 @@ include "macro.h"
     ORG     0
     JMP     McuReset
 _EpAddrTable:
-    MOV     A,SetMode
+    DECA    SetMode
     ADD     PC,A
     RETL    @C_EpAddr_SWI2c-0x10
     RETL    @C_EpAddr_SWNodeKey-0x10
-    RETL    C_EpAddr_TxChannel-0x10
+    RETL    @C_EpAddr_TxChannel-0x10
 
 _EpSizeTable:
-     MOV     A,SetMode
+     DECA    SetMode
      ADD     PC,A
      RETL    @2
      RETL    @2
@@ -125,7 +125,7 @@ _SaveSucessTable:
     JMP     ConfigRcv_RxChannel1            ;02 
     JMP     ConfigRcv_SaveTxChannelNums     ;03 
     JMP     FlashSucess                     ;04 
-    JMP     _RxDownCodeSaveNum              ;05 
+    JMP     ConfigRcv_SaveTxChannelNums     ;05 
     JMP     _SetRxData_SaveRData            ;06 
     JMP     _SetTxData_SaveTData            ;07 
 
@@ -613,10 +613,12 @@ ConfigRcv_GetData:
 ;************************************************
 ; 接收到的指令是  上游接收码，保存接收码
 ConfigRcv_RxChannel:                ; 设置发送方地址，需要填充地址码，信道
+    BS      ChannelNums,F_NoChange           ; 
     INCA    RF_MyNode
     JBC     StatusReg,ZeroFlag
     JMP     ConfigRcv_RxChannel1    ; 如果 上游CH=FF, 则不保存上游接收码, ChannelNums  不变
 
+    BC      ChannelNums,F_NoChange
     INC     ChannelNums             ; ChannelNums + 1,保存代码
 
     CALL    SetEpParam_ChannelNums
@@ -647,6 +649,9 @@ ConfigRcv_SaveMyNode:
     JMP     ConfigRcv_NumsChange    ; ChannelNums 改了，去保存
 
 ConfigRcv_SaveTxChannelNums:        ; ChannelNums 加1了，检查有没有重复，如果有重复，再不保存，成功返回
+    JBC     ChannelNums,F_NoChange
+    JMP     FlashSucess             ; ChannelNums没有改变，不用保存
+
     MOV     A,@2
     SUB     A,ChannelNums
     JBS     StatusReg,CarryFlag
@@ -739,15 +744,11 @@ _RxDownCodeEnd:
     JBS     StatusReg,ZeroFlag
     JMP     PresetRxTrans_LedOff                ; 类型错，重来
 
+    DEC     SetMode                     ; 保存在TX CHANNEL中，SetMode = 3
     INC     ChannelNums
     CALL    SetEpParam_ChannelNums
     MOV     A,@C_SaveEp_DownCode        ; 3 - 保存下游接收码
-    JMP     PresetSaveEp
-
-_RxDownCodeSaveNum:
-    MOV     A,@4
-    MOV     SetMode,A  
-    JMP     ConfigRcv_SaveTxChannelNums ; 去处理 TxNums+1,检查重复，保存 ChannelNums
+    JMP     PresetSaveEp                ; 保存完成，去保存 ChannelNums
 ;************************************************
 ;//MARK:ResetSystemParam
 ; IDLE模式，长按3秒， 清除系统参数
