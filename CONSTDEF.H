@@ -27,6 +27,7 @@ F_WDevAddr          equ      6
 	C_Time2s        ==      64
 	C_StartChannelNumber==  2
 	C_MaxChannelNumber   == 125
+    C_MaxKeyCnt     ==      5
 
 ;*******************************************************
 ; eprom 地址分配
@@ -42,9 +43,8 @@ F_WDevAddr          equ      6
                                 ; 0x21    RX addr2
                                 ; 0x22    RX addr3
     C_E2Addr_MyNode             ==   0x23   ;    我的节点号, 接收信道 CH
-    C_E2Addr_RxChannelNums      ==   0x24   ;    接收信道数
-    C_E2Addr_TxChannelNums      ==   0x25   ;    发送信道数
-    C_E2Addr_SwNodeNums         ==   0x26
+    C_E2Addr_TxChannelNums      ==   0x24   ;    发送信道数
+    C_E2Addr_SwNodeNums         ==   0x25
 
 
     C_EpAddr_TxChannel          ==  0x30   ; 30,40,50,60,70      向下游发送信道

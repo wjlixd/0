@@ -9,8 +9,6 @@ include	"Mini4X8LED.H"
 include "macro.h"
 
 
-
-
     ORG     0
     JMP     McuReset
 _EpAddrTable:
@@ -52,21 +50,19 @@ _ResetTable5:           ; 发送信道
     RETL    @0xB1       ; 信道码 01      
     RETL    @0xB2       ; 信道码 02      
     RETL    @0xB3       ; 信道码 03      
-    RETL    @0x05       ; RF-CH      
+    RETL    @0x03       ; RF-CH      
 
-
-_ResetTable1:
-    MOV     A,PrgTmp2
+_ResetTable1:           ; 接收参数，系统参数
+    MOV     A,PrgTmp2   
     ADD     PC,A
     RETL    @0xA1       ; 信道码 01      
     RETL    @0xA2       ; 信道码 02      
     RETL    @0xA3       ; 信道码 03      
     RETL    @0x02       ; RF-CH      
-    RETL    @0x00       ; 接收信道数, 无用
     RETL    @0x01       ; 发送信道数
-    RETL    @0x02       ; 设置开关数
+    RETL    @0x01       ; 设置开关数
 
-_ResetTable2:
+_ResetTable2:           ; 设置使用信道码
     MOV     A,PrgTmp2
     ADD     PC,A
     RETL    @0x34       ; 信道码 01      
@@ -74,19 +70,17 @@ _ResetTable2:
     RETL    @0x10       ; 信道码 03      
     RETL    @0x00       ; RF-CH      
 
-_ResetTable3:
+_ResetTable3:           ; 开关参数
     MOV     A,PrgTmp2
     ADD     PC,A
     RETL    @0x01       ; 节点1，
     RETL    @0x01       ; 按键值=1
 
-_ResetTable4:
+_ResetTable4:           ; I2C 开关参数
     MOV     A,PrgTmp2
     ADD     PC,A
-    RETL    @0x08       ; 节点8，
-    RETL    @0x02       ; 按键值=2
-
-
+    RETL    @0xB2       ; I2C地址
+    RETL    @0x0F       ; 开关开值
 
 _ResetAddrTable:
     DECA    SetMode
@@ -94,18 +88,17 @@ _ResetAddrTable:
     RETL    @C_EpAddr_RxChannel
     RETL    @C_E2Addr_Config
     RETL    @C_EpAddr_SWNodeKey
-    RETL    @C_EpAddr_SWNodeKey+0x10
+    RETL    @C_EpAddr_SWI2c
     RETL    @C_EpAddr_TxChannel
 
 _ResetSizeTable:
     DECA    SetMode
     ADD     PC,A
-    RETL    @7
+    RETL    @6
     RETL    @4
     RETL    @2
     RETL    @2
     RETL    @4
-
 
 ;*************************************************
 ;//MARK: 写EPROM成功列表
@@ -213,11 +206,6 @@ _TxFailTable:
     C_FlashSucessTime==     6   ; 0.5s
 
 ;//MARK: 接收数据 - 列表 
-;
-    ; C_RxData_Trans      ==  0       ; 接收转发
-    ; C_RxData_Config     ==  1       ; 接收设置信息
-    ; C_Tx2Rx_Code4B      ==  2
-
 
     C_Trans_Data        ==  0       ; 接收  - 转发数据;  SPI_Mode = 0
     C_SetDn_Data        ==  1       ; 与下游通信， SPI_Mode = 1
@@ -240,7 +228,6 @@ _RxDataEndTable:
     JMP     _RxDownCodeEnd          ; 接收到
     JMP     ConfigRcv_GetData       ;
 
-
 ;*************************************************
 GetMaxNums:
     DECA    SetMode
@@ -249,9 +236,6 @@ GetMaxNums:
     RETL    @C_MaxSWNum
     RETL    @C_MaxTxChannelNum
     RETL    @C_MaxTxChannelNum
-
-
-     
 
 GetInfoType:
     DECA    SetMode
@@ -266,16 +250,6 @@ _ConfigRcv_ReturnTable:
     JMP     ConfigRcv_SetNode
     JMP     ConfigRcv_SetSW
     JMP     ConfigRcv_RxChannel
-
-   C_MaxKeyCnt  ==   5
-; _IdleKeyCntTable:
-;     DECA    SetMode
-;     ADD     PC,A
-;     JMP     IdlePress2Key           ; 设置节点号
-;     JMP     IdlePress3Key           ; 设置开关信息
-;     JMP     IdlePress4Key           ; 接收发送码，发送接收码
-;     JMP     IdlePress5Key           ; 发送接收码，接收发送码
-
 
 _ChannelNum_EpTable:
     DECA    SetMode
@@ -333,7 +307,6 @@ _mainTable:
     JMP     WaitTimeOver_NoLed      ;10 等待超时，LED不变，接收模式
 ; 转发结束，比较节点是否与我的节点信息，相同，如果2字节相同，则继电器动作
 
-    C_MaxMode   ==   $-_mainTable-2
 ;    M_I2CMaster201911
 include "com.asm"
 ;******************************************
@@ -606,7 +579,6 @@ ConfigRcv_GetData:
     JBS     StatusReg,ZeroFlag      ; 设置类型与接收到的类型相同
     JMP     PresetRxTrans_LedOff    ; 类型不同，退到 PresetRxData
 
-;    MOV     A,@C_RX2TX_Config       ; RX to TX
     JMP     PresetRx2Tx
 
 ;_ConfigRcv_ReturnTable:
@@ -707,9 +679,8 @@ ConfigRcv_NumsChange:
     JMP     PresetSaveEp
 ;************************************************
 ;//MARK: 设置5键，发送我的节点，接收下游节点，并保存
-IdlePress5Key:
-;    MOV     A,@C_TxData_MyNode  ; 设置 config 通道
-    JMP     PresetTxData
+; IdlePress5Key:
+;     JMP     PresetTxData
 
 _TxMyNode_SetData:              ; 设置数据开始
     MOV     A,@C_TxData
@@ -734,9 +705,8 @@ _TxMyNode_ReadEp:
 ;************************************************
 ; 数据发送完成，转为接收模式
 
-_Tx2Rx:
-;    MOV     A,@C_Tx2Rx_Code4B
-    JMP     PresetTx2Rx
+; _Tx2Rx:
+;     JMP     PresetTx2Rx
 
 _RxDownCodeEnd:
     MOV     A,@C_RFType+1

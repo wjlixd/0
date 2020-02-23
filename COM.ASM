@@ -599,6 +599,7 @@ WaitRx2TxEnd:
     JMP     main      
     JMP     _TxCode4B+1
 ;*************************************************
+IdlePress5Key:
 PresetTxData:
     SWAPA   ChannelNums             ; 根据 ChannelNums -- 转为 TxCh 地址，设置发送信道 
     ADD     A,@C_EpAddr_TxChannel-0x10
@@ -665,6 +666,7 @@ PresetRxData:
 
 _RxCode4B:
     CALL    BufferInitTx            ; 设置接收参数
+_Tx2Rx:
 PresetTx2Rx:                        ; 发射转为接收模式
     BC      P_CE,B_CE
     CALL    SetSPI_CLRIRQ           ; 清除IRQ中断

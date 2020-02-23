@@ -9,7 +9,7 @@ BlockNum=0
 BlockNum=0
 [BREAKPOINT]
 BP Num=1
-BP0=1,A,1242244,1,63294124,585,$\main.asm
+BP0=1,A,1242244,1,63294124,583,$\main.asm
 [CODEOPTION]
 Option Num=9
 Target Power=1
