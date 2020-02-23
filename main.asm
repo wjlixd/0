@@ -199,7 +199,7 @@ _TxFailTable:
     ; ms 按键弹起计数按键数等待时间 1秒
     ; 保存EProm等待时间           1秒
     ; 读  EProm等待时间           1秒
-    C_WaitEpTime    ==      30
+    C_WaitEpTime    ==      5   ; ms 
 
     C_KeyUpTime     ==      30  ; ms    
 
@@ -339,11 +339,14 @@ include "com.asm"
 ;******************************************
 ;//MARK: IdleModeCode
 IdleModeCode:
+    MOV     A,SetMode
+    JBC     StatusReg,ZeroFlag
+    JMP     $+5
+
     JBS     IntKeyValue,B_KeyUp
     BS      P_LED,B_LED
     JBC     IntKeyValue,B_KeyUp
     BC      P_LED,B_LED
-
 
     CALL    ChkKeyDown
     JBS     StatusReg,CarryFlag
@@ -494,7 +497,7 @@ _RelayChange:
     BC      P_Relay,B_Relay
     JBC     RelayStatus,0
     BS      P_Relay,B_Relay
-    JMP     PresetRxTrans
+    JMP     TimeSpaceRcv
 
     CLR     SetMode                 ; 准备读 SW I2C地址
     CALL    SetEpParam_ChannelNums
