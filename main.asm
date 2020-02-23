@@ -168,24 +168,24 @@ _ReadSucessTable:
 ;*************************************************
 ;//MARK: 发送数据 - 列表
 
-    C_TxData_Trans      ==  0       ;ok  向上下游转发开关信息
-    C_RX2TX_Config      ==  1       ;
-    C_TxData_MyNode     ==  2
+    ; C_TxData_Trans      ==  0       ;ok  向上下游转发开关信息
+    ; C_RX2TX_Config      ==  1       ;
+    ; C_TxData_MyNode     ==  2
 
 _SetTxDataTable:
     MOV     A,SPI_Mode
     ADD     PC,A
     JMP     _RcvTrans_SetData       ; 
-    JMP     _ConfigRcv_ReturnTable  ;
     JMP     _TxMyNode_SetData       ;
+    JMP     _ConfigRcv_ReturnTable  ;
 
 ; 发送数据成功后处理
 _TxDataEndTable:                    
     MOV     A,SPI_Mode
     ADD     PC,A
     JMP     _NextSWNums
-    JMP     _ConfigRcv_SaveTable
     JMP     _Tx2Rx
+    JMP     _ConfigRcv_SaveTable
 
 ; 发送数据失败处理
 _TxFailTable:                       
@@ -214,15 +214,15 @@ _TxFailTable:
 
 ;//MARK: 接收数据 - 列表 
 ;
-    C_RxData_Trans      ==  0       ; 接收转发
-    C_RxData_Config     ==  1       ; 接收设置信息
-    C_Tx2Rx_Code4B      ==  2
+    ; C_RxData_Trans      ==  0       ; 接收转发
+    ; C_RxData_Config     ==  1       ; 接收设置信息
+    ; C_Tx2Rx_Code4B      ==  2
 
 
-    C_Trans_Data        ==  0       ; 接收  - 转发数据
-SetSpiMode:
-    MOV     SPI_Mode,A
-    RET
+    C_Trans_Data        ==  0       ; 接收  - 转发数据;  SPI_Mode = 0
+    C_SetDn_Data        ==  1       ; 与下游通信， SPI_Mode = 1
+    C_SetUp_Data        ==  2       ; 与上游通信， SPI_Mode = 2
+
 
 ; 接收超时表
 ; _RxTimeOverTable: 
@@ -237,8 +237,8 @@ _RxDataEndTable:
     MOV     A,SPI_Mode
     ADD     PC,A
     JMP     _IdleRcvTrans           ; 接收到转发信息处理
-    JMP     ConfigRcv_GetData       ;
     JMP     _RxDownCodeEnd          ; 接收到
+    JMP     ConfigRcv_GetData       ;
 
 
 ;*************************************************
@@ -587,6 +587,8 @@ _ReadChannelNumsOk:
     JBC     StatusReg,CarryFlag
     JMP     ResetKeyCnt
 
+    INC     SPI_Mode                ; 与下游通信， SPI_Mode = 1
+
     MOV     A,SetMode
     XOR     A,@C_MaxKeyCnt-1
     JBC     StatusReg,ZeroFlag
@@ -596,8 +598,7 @@ _ReadChannelNumsOk:
 IdlePress2Key:                      ; 接收发送来的节点号，然后保存
 IdlePress3Key:                      ; 接收发送来的开关节点号，键值
 IdlePress4Key:                      ; 发送我的接收信道码，CH给发送方
-
-    MOV     A,@C_RxData_Config
+    INC     SPI_Mode                ; 与上游通信， SPI_Mode = 2
     JMP     PresetRxData
 ConfigRcv_GetData:
     CALL    GetInfoType
@@ -605,7 +606,7 @@ ConfigRcv_GetData:
     JBS     StatusReg,ZeroFlag      ; 设置类型与接收到的类型相同
     JMP     PresetRxTrans_LedOff    ; 类型不同，退到 PresetRxData
 
-    MOV     A,@C_RX2TX_Config       ; RX to TX
+;    MOV     A,@C_RX2TX_Config       ; RX to TX
     JMP     PresetRx2Tx
 
 ;_ConfigRcv_ReturnTable:
@@ -702,7 +703,7 @@ ConfigRcv_NumsChange:
 ;************************************************
 ;//MARK: 设置5键，发送我的节点，接收下游节点，并保存
 IdlePress5Key:
-    MOV     A,@C_TxData_MyNode  ; 设置 config 通道
+;    MOV     A,@C_TxData_MyNode  ; 设置 config 通道
     JMP     PresetTxData
 
 _TxMyNode_SetData:              ; 设置数据开始
@@ -729,7 +730,7 @@ _TxMyNode_ReadEp:
 ; 数据发送完成，转为接收模式
 
 _Tx2Rx:
-    MOV     A,@C_Tx2Rx_Code4B
+;    MOV     A,@C_Tx2Rx_Code4B
     JMP     PresetTx2Rx
 
 _RxDownCodeEnd:
@@ -852,8 +853,7 @@ PresetRxTrans:
     MOV     I2CAddr,A
 
     BC      TRFlagReg,F_Config
-    MOV     A,@C_Trans_Data
-    CALL    SetSpiMode
+    CLR     SPI_Mode                ; 转发数据， SPI_Mode = 0
 
     CLR     TRMode
     CLR     SetMode                 ;  = InfoSN 
@@ -861,7 +861,7 @@ PresetRxTrans:
     MOV     KeyTime,A               ;  = MyNode 在转发信息时使用，在此初始化
 
     CALL    ClearKeyFlag
-    MOV     A,@C_RxData_Trans
+;    MOV     A,@C_RxData_Trans
     JMP     PresetRxData
 ;*************************************
 TimeSpaceRcv:
