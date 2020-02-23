@@ -109,35 +109,25 @@ _ResetSizeTable:
 
 ;*************************************************
 ;//MARK: 写EPROM成功列表
-
-    C_SaveEp_Reset      ==      00
-    C_SaveEp_UpCode     ==      01  ;OK
-    C_SaveEp_SWNodeKey  ==      02
-    C_SaveEp_ChannelNums==      03
-    C_SaveEp_DownCode   ==      04
-    C_SaveEp_RData      ==      05
-    C_SaveEp_TData      ==      06
-    C_SaveEp_I2CSW      ==      07
+    C_SaveEp_I2CSW      ==      00
+    C_SaveEp_Reset      ==      01
+    C_SaveEp_UpCode     ==      02  ;OK
+    C_SaveEp_SWNodeKey  ==      03
+    C_SaveEp_ChannelNums==      04
+    C_SaveEp_DownCode   ==      05
+    C_SaveEp_RData      ==      06
+    C_SaveEp_TData      ==      07
 _SaveSucessTable:
     MOV     A,Ep_Mode
     ADD     PC,A
-    JMP     _ConfirmResetSaveOk             ; 00
-    JMP     ConfigRcv_RxChannel1            ; 01
-    JMP     ConfigRcv_SaveTxChannelNums     ; 02
-    JMP     FlashSucess                     ; 03
-    JMP     _RxDownCodeSaveNum              ; 04
-    JMP     _SetRxData_SaveRData            ; 05
-    JMP     _SetTxData_SaveTData            ; 06
-;    JMP     PresetRxTrans                   ; 
-TimeSpaceRcv:
-    MOV     A,@C_WaitTimeOver
-    CALL    WaitTxTime_Mode
-    JMP     main
-;*************************************************
-;//MARK: 写EPROM失败列表
-;_SaveFailTable:
-;    M_LEDON
-;    JMP     ResetKeyCnt
+    JMP     TimeSpaceRcv                    ;00
+    JMP     _ConfirmResetSaveOk             ;01 
+    JMP     ConfigRcv_RxChannel1            ;02 
+    JMP     ConfigRcv_SaveTxChannelNums     ;03 
+    JMP     FlashSucess                     ;04 
+    JMP     _RxDownCodeSaveNum              ;05 
+    JMP     _SetRxData_SaveRData            ;06 
+    JMP     _SetTxData_SaveTData            ;07 
 
 ;*************************************************
 ;//MARK: 读EPROM成功列表
@@ -151,8 +141,8 @@ TimeSpaceRcv:
     C_ReadEp_Cfg_RxChannel  ==  07  ;
     C_ReadEp_TxCode4B       ==  08
     C_ReadEp_TxCodeSwInfo   ==  09  ;
-    C_ReadEp_Sleep          ==  10
-    C_ReadEp_RelaySWAddr    ==  11
+    C_ReadEp_Sleep          ==  10  ; 启动后读开机参数，是否需要写EP测试数据
+    C_ReadEp_RelaySWAddr    ==  11  ; 读 I2C开关地址，3B,4B,5B等2B
 
 _ReadSucessTable:
     MOV     A,Ep_Mode
@@ -181,13 +171,6 @@ _ReadSucessTable:
     C_TxData_Trans      ==  0       ;ok  向上下游转发开关信息
     C_RX2TX_Config      ==  1       ;
     C_TxData_MyNode     ==  2
-
-; 发送代码表
-_TxCodeAddrTable:                   
-    ADD     PC,A
-    RETL    @0                      ; 无用
-    RETL    @0                      ; 无用
-    RETL    @C_E2Addr_Config        ;
 
 _SetTxDataTable:
     MOV     A,SPI_Mode
@@ -234,29 +217,20 @@ _TxFailTable:
     C_RxData_Trans      ==  0       ; 接收转发
     C_RxData_Config     ==  1       ; 接收设置信息
     C_Tx2Rx_Code4B      ==  2
-; 接收码表
-_RxCodeAddrTable:                   
-    ADD     PC,A
-    RETL    @C_EpAddr_RxChannel     ; 按我的CODE接收
-    RETL    @C_E2Addr_Config    
-    RETL    @0
 
 
-_RxWaitTimeTable:
-    MOV     A,SPI_Mode
-    ADD     PC,A
-    RETL    @1                      ; 接收模式等待1秒后，处理按键
-    RETL    @C_QuitTime
-    RETL    @C_QuitTime
-
+    C_Trans_Data        ==  0       ; 接收  - 转发数据
+SetSpiMode:
+    MOV     SPI_Mode,A
+    RET
 
 ; 接收超时表
-_RxTimeOverTable: 
-    MOV     A,SPI_Mode
-    ADD     PC,A
-    JMP     IdleModeCode_LedOff     ; 没接收到信息，按键处理
-    JMP     PresetRxTrans_LedOff    ; 
-    JMP     PresetRxTrans_LedOff    ; 
+; _RxTimeOverTable: 
+    ; MOV     A,SPI_Mode
+    ; ADD     PC,A
+    ; JMP     IdleModeCode_LedOff     ; 没接收到信息，按键处理
+    ; JMP     PresetRxTrans_LedOff    ; 
+    ; JMP     PresetRxTrans_LedOff    ; 
 
 ; 接收数据成功表
 _RxDataEndTable:
@@ -319,8 +293,11 @@ _ConfigRcv_SaveTable:
     JMP     ConfigRcv_SaveTxChannelNums
 
 ;*************************************************
-_ReadFailTable:
 _SaveFailTable:
+    MOV     A,Ep_Mode
+    JBC     StatusReg,ZeroFlag
+    JMP     PresetRxTrans           ; 操作I2C开关失败，恢复接收模式
+_ReadFailTable:
 ResetKeyCnt:
     CLR     SetMode
     CLR     TRMode
@@ -360,9 +337,6 @@ _mainTable:
 ;    M_I2CMaster201911
 include "com.asm"
 ;******************************************
-IdleModeCode_LedOff:
-    CLR     TRMode
-    BC      P_LED,B_LED
 ;//MARK: IdleModeCode
 IdleModeCode:
     JBS     IntKeyValue,B_KeyUp
@@ -444,8 +418,7 @@ NextSWInfo:
     JBC     StatusReg,ZeroFlag
     JMP     ChkSWNode               ; 没设置过，不能转发
 
-    MOV     A,@C_TxData_Trans
-    JMP     PresetTxNums
+    JMP     PresetTxData            ; 设置发送信道
 
 _RcvTrans_SetData:
     MOV     A,MyNode                ; 上游节点
@@ -868,16 +841,16 @@ WaitTimeOverLedOff:                 ; 等待超时,LED熄灭
     DJZA    QuitTime
     JMP     main
 PresetRxTrans_LedOff:
+_RxTimeOverTable:
     BC      P_LED,B_LED
-WaitTimeOver_NoLed:                 ; 等待超时,LED状态不变
-    DJZA    QuitTime
-    JMP     main
 ;//MARK:    PresetRxTrans
 PresetRxTrans:
     MOV     A,@0xA0
     MOV     I2CAddr,A
 
     BC      TRFlagReg,F_Config
+    MOV     A,@C_Trans_Data
+    CALL    SetSpiMode
 
     CLR     TRMode
     CLR     SetMode                 ;  = InfoSN 
@@ -887,7 +860,14 @@ PresetRxTrans:
     CALL    ClearKeyFlag
     MOV     A,@C_RxData_Trans
     JMP     PresetRxData
-
+;*************************************
+TimeSpaceRcv:
+    MOV     A,@C_WaitTimeOver
+    CALL    WaitTxTime_Mode
+WaitTimeOver_NoLed:                 ; 等待超时,LED状态不变
+    DJZA    QuitTime
+    JMP     main
+    JMP     PresetRxTrans
 ;*************************************
 ;//TODO: SoftTimer
 SoftTimer:

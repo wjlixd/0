@@ -590,8 +590,6 @@ _I2CCompPageLoop:
 ;  所以需要加入等待时间
 ;      发送转接收不需要等待时间
 PresetRx2Tx:
-    MOV     SPI_Mode,A
-
     MOV     A,@5
     CALL    SetQuitTime_ms          ; 等待时间最少32ms     
     MOV     A,@C_WaitRx2TxEnd
@@ -601,22 +599,15 @@ WaitRx2TxEnd:
     JMP     main      
     JMP     _TxCode4B+1
 ;*************************************************
-; 根据 ChannelNums -- 转为 TxCh 地址，设置发送信道  
-PresetTxNums:                       ; ChannelNums - >等到 TxCh地址
-    MOV     SPI_Mode,A
-    SWAPA   ChannelNums
-    ADD     A,@C_EpAddr_TxChannel-0x10
-    JMP     $+3
-;//MARK: 发送数据进程
-; 【A】 - 发送码，I2C 地址
 PresetTxData:
-    MOV     SPI_Mode,A
-    CALL    _TxCodeAddrTable
+    SWAPA   ChannelNums             ; 根据 ChannelNums -- 转为 TxCh 地址，设置发送信道 
+    ADD     A,@C_EpAddr_TxChannel-0x10
+    JBC     TRFlagReg,F_Config
+    MOV     A,@C_E2Addr_Config      ; Config地址
 
     CALL    SetEpParamCh0
     MOV     A,@C_ReadEp_TxCode4B
     JMP     PresetReadEp
-
 _TxCode4B:
     CALL    BufferInitTx            ; 设置信道数据
 
@@ -663,21 +654,18 @@ _SetTxData_SaveTData:
     JMP     _TxDataEndTable         ; 数据发送成功
     JMP     _TxFailTable			; 超次数重发
 ;************************************************
-; 接收数据进程
-PresetTx2Rx:
-    MOV     SPI_Mode,A
-    JMP     _RxCode4B+1             ; 发射转为接收模式
 ;//MARK: 接收数据进程
 PresetRxData:
-    MOV     SPI_Mode,A
-    CALL    _RxCodeAddrTable        ; 查询接收地址表
+    MOV     A,@C_EpAddr_RxChannel
+    JBC     TRFlagReg,F_Config
+    MOV     A,@C_E2Addr_Config
     CALL    SetEpParamCh0
     MOV     A,@C_ReadEp_RxCode4B
     JMP     PresetReadEp            ; 读接收信道码 4B
 
 _RxCode4B:
     CALL    BufferInitTx            ; 设置接收参数
-
+PresetTx2Rx:                        ; 发射转为接收模式
     BC      P_CE,B_CE
     CALL    SetSPI_CLRIRQ           ; 清除IRQ中断
     MOV     A,@0x3F                 ; 接收中断，接收模式
@@ -690,9 +678,7 @@ _RxCode4B:
     JMP     ResetKeyCnt
 
     MOV     A,@C_WaitRxDataReturn
-    MOV     TRMode,A
-    CALL    _RxWaitTimeTable        ; 设置接收等待时间
-    CALL    SetQuitTime_500ms       ; 时间单位 0.5s
+    CALL    ResetQuitTime_Mode
     CALL    ClrFailFlag
 ;************************************************
 WaitRxDataReturn:                   ; 等待接收端返回节点数据
