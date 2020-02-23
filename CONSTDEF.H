@@ -12,7 +12,7 @@ F_WDevAddr          equ      6
 ;TRFlagReg         
     F_16ms          equ      7      ; 
     F_Config        equ      6      ; 继电器当前状态
-
+    F_I2CSlow       equ      5      ; 1 - 写指令加入等待
     F_QuitTime32ms  equ      4      ; 0 - QuitTime每500ms减1， 1-QuitTime 每32ms减1
     F_500ms         equ      3      ; 1 - 500ms 时间到，
     F_250ms         equ      2      ; 1 - 250ms 时间到
@@ -62,7 +62,7 @@ F_WDevAddr          equ      6
 
 
     C_MaxTxChannelNum          ==   10  ; 最大发送信道数
-    C_MaxSWNum                 ==   10
+    C_MaxSWNum                 ==   8
 
 ;IntKeyValue
 ;   B_Key           ==      6

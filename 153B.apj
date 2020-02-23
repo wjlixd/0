@@ -9,7 +9,7 @@ BlockNum=0
 BlockNum=0
 [BREAKPOINT]
 BP Num=1
-BP0=1,A,1242244,1,63294124,583,$\main.asm
+BP0=1,A,1241644,1,63294124,452,$\main.asm
 [CODEOPTION]
 Option Num=9
 Target Power=1
@@ -38,9 +38,7 @@ AGENT=0
 [LibraryProject]
 LibraryProject=0
 [LastOpenFiles]
-File0=$\main.asm
-File1=$\COM.ASM
-File Num=2
+File Num=0
 [Source Files]
 File Num=1
 File0=$\main.asm
@@ -111,3 +109,7 @@ Size#1=0
 Size#2=0
 [ICEVOLTAGE SETTING]
 Voltage=1
+[$\CONSTDEF.H]
+Rectangle=0154 0154 0727 0602
+Iconized=0
+Maximized=1

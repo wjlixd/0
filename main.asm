@@ -12,17 +12,17 @@ include "macro.h"
     ORG     0
     JMP     McuReset
 _EpAddrTable:
-    DECA    SetMode
+    DECA    SetMode         ; 123, 012
     ADD     PC,A
-    RETL    @C_EpAddr_SWI2c-0x10
     RETL    @C_EpAddr_SWNodeKey-0x10
+    RETL    @C_EpAddr_TxChannel-0x10
     RETL    @C_EpAddr_TxChannel-0x10
 
 _EpSizeTable:
      DECA    SetMode
      ADD     PC,A
      RETL    @2
-     RETL    @2
+     RETL    @4
      RETL    @4
 
 _BitTable:
@@ -42,9 +42,8 @@ _RxChannelTable:
     JMP     _ResetTable1
     JMP     _ResetTable2
     JMP     _ResetTable3
-    JMP     _ResetTable4
 
-_ResetTable5:           ; 发送信道
+_ResetTable4:           ; 发送信道
     MOV     A,PrgTmp2
     ADD     PC,A
     RETL    @0xB1       ; 信道码 01      
@@ -59,8 +58,13 @@ _ResetTable1:           ; 接收参数，系统参数
     RETL    @0xA2       ; 信道码 02      
     RETL    @0xA3       ; 信道码 03      
     RETL    @0x02       ; RF-CH      
+if EMulater == 0
     RETL    @0x01       ; 发送信道数
     RETL    @0x01       ; 设置开关数
+else
+    RETL    @0x00       ; 发送信道数
+    RETL    @0x00       ; 设置开关数
+endif
 
 _ResetTable2:           ; 设置使用信道码
     MOV     A,PrgTmp2
@@ -75,11 +79,7 @@ _ResetTable3:           ; 开关参数
     ADD     PC,A
     RETL    @0x01       ; 节点1，
     RETL    @0x01       ; 按键值=1
-
-_ResetTable4:           ; I2C 开关参数
-    MOV     A,PrgTmp2
-    ADD     PC,A
-    RETL    @0xB2       ; I2C地址
+    RETL    @0xB6       ; I2C地址
     RETL    @0x0F       ; 开关开值
 
 _ResetAddrTable:
@@ -88,7 +88,6 @@ _ResetAddrTable:
     RETL    @C_EpAddr_RxChannel
     RETL    @C_E2Addr_Config
     RETL    @C_EpAddr_SWNodeKey
-    RETL    @C_EpAddr_SWI2c
     RETL    @C_EpAddr_TxChannel
 
 _ResetSizeTable:
@@ -96,8 +95,7 @@ _ResetSizeTable:
     ADD     PC,A
     RETL    @6
     RETL    @4
-    RETL    @2
-    RETL    @2
+    RETL    @4
     RETL    @4
 
 ;*************************************************
@@ -135,7 +133,6 @@ _SaveSucessTable:
     C_ReadEp_TxCode4B       ==  08
     C_ReadEp_TxCodeSwInfo   ==  09  ;
     C_ReadEp_Sleep          ==  10  ; 启动后读开机参数，是否需要写EP测试数据
-    C_ReadEp_RelaySWAddr    ==  11  ; 读 I2C开关地址，3B,4B,5B等2B
 
 _ReadSucessTable:
     MOV     A,Ep_Mode
@@ -151,7 +148,6 @@ _ReadSucessTable:
     JMP     _TxCode4B               ;08
     JMP     ConfigRcv_ChkDataRecover;09
     JMP     _McuReset_Sleep         ;10
-    JMP     _RelaySWAddr            ;11
 ;*************************************************
 ;//MARK: 读EPROM失败列表
 ; _ReadFailTable:
@@ -432,6 +428,8 @@ _ChkNextSWNum:
     JMP     PresetRxTrans           ; 所有SW节点检查完成
 
     CALL    SetEpParam_ChannelNums  ; 从节点，键值表读 2节点
+    MOV     A,@4
+    MOV     Buf_RamSize,A           ; 2B -SW, 2B-I2C addr 
     MOV     A,@C_ReadEp_SWCode2B
     JMP     PresetReadEp
 
@@ -450,45 +448,41 @@ _NextSWNodeKey:
     DEC     ChannelNums
     JMP     _ChkNextSWNum     
 ;************************************************
-;//MARK: RelayChange
+;//MARK: RelayChange                ; 与查表相同的节点，键值
 _RelayChange:
-    MOV     A,RF_Data+1
-    AND     A,@7
-    MOV     ChannelNums,A           ; ChannelNums = RF_Data+1
+    DECA    ChannelNums
     CALL    _BitTable
-    XOR     RelayStatus,A
+    XOR     RelayStatus,A           ; 保存当前状态
     AND     A,RelayStatus
+    MOV     PrgTmp1,A               ; 当关开关信息，保存
     BC      P_LED,B_LED
-    JBS     StatusReg,ZeroFlag
+    JBS     StatusReg,ZeroFlag      ; 开时灯亮，灭时灯灭
     BS      P_LED,B_LED
 
-    MOV     A,RF_Data+1
-    JBS     StatusReg,ZeroFlag
-    JMP     $+6
+    JZA     RF_Data+2               ; FF  - 本地
+    JMP     $+7
 ;RF_Data = 0, 设置本地继电器
-    JBS     RelayStatus,0
-    BC      P_Relay,B_Relay
-    JBC     RelayStatus,0
+    MOV     A,PrgTmp1               ; 本地继电器操作
+    JBS     StatusReg,ZeroFlag
     BS      P_Relay,B_Relay
+    JBC     StatusReg,ZeroFlag
+    BC      P_Relay,B_Relay
     JMP     TimeSpaceRcv
 
-    CLR     SetMode                 ; 准备读 SW I2C地址
-    CALL    SetEpParam_ChannelNums
-    MOV     A,@C_ReadEp_RelaySWAddr
-    JMP     PresetReadEp
-_RelaySWAddr:
-    MOV     A,RF_Data
+    MOV     A,RF_Data+2             ; I2C 继电器操作
     MOV     I2CAddr,A
     MOV     A,@1
     MOV     RF_Data,A
+    MOV     A,RF_Data+3
+    MOV     RF_Data+1,A
 
-    MOV     A,ChannelNums
-    CALL    _BitTable
-    AND     A,RelayStatus
+    MOV     A,PrgTmp1
     JBC     StatusReg,ZeroFlag
-    CLR     RF_Data+1
-
-    CLR     Buf_EpAddr              ; EP ADDR = 0
+    CLR     RF_Data+1               ; 设置好发送的数据
+    
+    CALL    SetEpParam_I2CAddr      ; 设置地址
+    CLR     Buf_EpAddr
+    BS      TRFlagReg,F_I2CSlow     ; I2C 速度慢，需要等待
     MOV     A,@C_SaveEp_I2CSW
     JMP     PresetSaveEp
 
@@ -500,6 +494,7 @@ SetEpParam_ChannelNums:
 
     CALL    _EpAddrTable
     ADD     Buf_EpAddr,A   
+SetEpParam_I2CAddr:    
     CALL    _EpSizeTable
     JMP     SetEpParamCh0+2
 ;TODO: SetEpParamCh0
@@ -739,7 +734,7 @@ ConfirmReset:
     JBS     IntKeyValue,B_KeyDown3s
     JMP     WaitTimeOverLedOff          ; 超时退到 PresetRxData
 
-    MOV     A,@5
+    MOV     A,@4
     MOV     SetMode,A
 _ConfirmResetNext:
     CALL    _ResetSizeTable
@@ -834,6 +829,8 @@ PresetRxTrans:
     CLR     SetMode                 ;  = InfoSN 
     MOV     A,@1
     MOV     KeyTime,A               ;  = MyNode 在转发信息时使用，在此初始化
+
+    BC      TRFlagReg,F_I2CSlow     ; 默认EPROM，快速
 
     CALL    ClearKeyFlag
 ;    MOV     A,@C_RxData_Trans

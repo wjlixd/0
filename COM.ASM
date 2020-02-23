@@ -372,7 +372,8 @@ I2C_SCLi_SDAo0:
 	MOV     A,@C_I2CSclIn_SdaOut        ; SCL =1 ,SDA 1->0
 	IOW     P_SDA
 	BC      P_SDA,B_SDA
-    RET
+    ; RET
+    JMP     Wait3us
 ;//NOTE:I2C_SCLi_SDAo
 I2C_SCLi_SDAo:
 	MOV     A,@C_I2CSclIn_SdaOut        ; SCL =1 ,SDA 1->0
@@ -392,7 +393,10 @@ I2C_SCLo_SDAo:                          ; SCL 只能输出为0
 ;//NOTE:  I2C_SendAck
 I2C_SendAck:
 	CALL    I2C_BUSo0                   ; SCL=0, SDA=0
-    JMP     I2C_SCLi_SDAo               ; SCL=1, SDA=0
+    CALL    Wait3us    
+    CALL    I2C_SCLi_SDAo               ; SCL=1, SDA=0
+    JMP     Wait3us    
+
 ;*************************************************	
 ; 命令字放在A中  , EPROM 传输一个命令字
 ;          __      ____
@@ -413,7 +417,9 @@ _I2CWriteCommandLoop:
 	JBC		Prgtmp3,7
 	BS		P_SDA,B_SDA	;
 
+    CALL    Wait3us    
 	CALL    I2C_SCLi_SDAo	    ; SCL=1
+    CALL    Wait3us    
 
 	RLC		Prgtmp3
 	DJZ		Prgtmp4
@@ -432,13 +438,14 @@ I2C_GetAck:
 	IOW     P_SCL
 	BC      P_SCL,B_SCL
 
+    CALL    Wait3us    
+
 ;//NOTE:I2C_BusIn
 I2C_BusIn:
 	MOV     A,@C_I2CBusIn
 	IOW     P_SCL
-	RET
-	
-
+	; RET
+	JMP     Wait3us
 ;******************************************************
 ;读一个字节,  
 ;//TODO:  I2C_ReadByte
@@ -506,7 +513,9 @@ _I2CReadPageEnd:
 ;//mark:   I2C_Stop
 I2C_Stop:
     CALL    I2C_BUSo0                   ; SCL=0, SDA=0
+    CALL    Wait3us    
     CALL    I2C_SCLi_SDAo               ; SCL=1, SDA=0
+    CALL    Wait3us    
     BC      StatusReg,CarryFlag
     JMP     I2C_BusIn                   ; SCL=1, SDA=1
 
@@ -753,4 +762,12 @@ ClrFailFlag:
     BC      EpNum,F_RFail
     RET
 ;************************************************
-
+Wait3us:
+    JBS     TRFlagReg,F_I2CSlow     ; I2C 速度慢，需要等待
+    RET
+    MOV     A,@60
+    ADD     A,@0xFF                     ; 3*A+5
+    JBS     StatusReg,ZeroFlag
+    JMP     $-2
+    RET
+;************************************************
