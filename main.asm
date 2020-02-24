@@ -202,10 +202,9 @@ _TxFailTable:
     ; 读  EProm等待时间           1秒
     C_WaitEpTime    ==      5   ; ms 
 
+    ; 检测按键次数，两次按键间间隔时间
     C_KeyUpTime     ==      30  ; ms    
 
-    ; SPI 发送数据等待时间， 320ms 
-    C_SpiTxTime     ==      10  ; ms
 
     ; 等待用户按键时间  15秒
     C_WaitKeyTime   ==      30  ; 0.5s,
@@ -322,16 +321,15 @@ include "com.asm"
 IdleModeCode:
     MOV     A,SetMode
     JBC     StatusReg,ZeroFlag
-    JMP     $+5
+    JMP     $+4
 
+    BC      P_LED,B_LED
     JBS     IntKeyValue,B_KeyUp
     BS      P_LED,B_LED
-    JBC     IntKeyValue,B_KeyUp
-    BC      P_LED,B_LED
 
-    CALL    ChkKeyDown
-    JBS     StatusReg,CarryFlag
+    JBS     IntKeyValue,B_KeyDown
     JMP     _IdleChkKeyUp
+    BC      IntKeyValue,B_KeyDown
 
     INC     SetMode
     MOV     A,@C_KeyUpTime
@@ -344,6 +342,9 @@ _IdleChkKeyUp:
     JMP     _IdleChkKey3s
 
     DJZA    KeyTime
+    JMP     main
+
+    JBS     IntKeyValue,B_KeyUp
     JMP     main
 
     MOV     A,@2
@@ -652,8 +653,7 @@ _CompareNext:
 ;//MARK: EPROM 比较数据进程
 PresetCompEp:
     MOV     A,@C_CompEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime
+    CALL    WaitTxTime_Mode
 CompEpromData:
     MOV     A,Buf_EpAddr
     MOV     PrgTmp2,A
@@ -845,7 +845,6 @@ PresetRxTrans:
     BC      TRFlagReg,F_I2CSlow     ; 默认EPROM，快速
 
     CALL    ClearKeyFlag
-;    MOV     A,@C_RxData_Trans
     JMP     PresetRxData
 ;*************************************
 TimeSpaceRcv:

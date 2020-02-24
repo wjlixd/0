@@ -275,29 +275,17 @@ BufferInitTx:
     RET
 
 ;*************************************
-
 WaitTxTime_Mode:
     MOV     TRMode,A
-WaitTxTime:    
-    MOV     A,@C_SpiTxTime
-    JMP     SetQuitTime_ms
-SetWriteEpWaitTime:
-    MOV     A,@C_WaitEpTime
-    JMP     SetQuitTime_ms   
-SetKeyUpTime:
-    MOV     A,@C_KeyUpTime
-SetQuitTime_ms:    
+    MOV     A,@C_WaitEpTime         ; 5*30= 150MS
     MOV     QuitTime,A
     BS      TRFlagReg,F_QuitTime32ms
     RET
-
-
-
+; 用于3秒快闪，  15秒等待按键输入
 SetQuitTime_500ms:
     MOV     QuitTime,A
     BC      TRFlagReg,F_QuitTime32ms
     RET
-
 
 ;*************************************
 FLed_SlowBlink:
@@ -335,10 +323,8 @@ ClearKeyFlag:                       ; 按键标志2个，B_KeyDown，B_KeyDown3s可清除
 ;  所以需要加入等待时间
 ;      发送转接收不需要等待时间
 PresetRx2Tx:
-    MOV     A,@5
-    CALL    SetQuitTime_ms          ; 等待时间最少32ms     
     MOV     A,@C_WaitRx2TxEnd
-    MOV     TRMode,A
+    CALL    WaitTxTime_Mode
 WaitRx2TxEnd:
     DJZA    QuitTime
     JMP     main      
@@ -455,8 +441,7 @@ _SetRxData_SaveRData:
 PresetSaveEp:
     MOV     Ep_Mode,A
     MOV     A,@C_SaveEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime      ; 设置保存EPROM时间
+    CALL    WaitTxTime_Mode
 SaveEpromData:
     MOV     A,Buf_EpAddr
     MOV     PrgTmp2,A
@@ -476,8 +461,7 @@ SaveEpromData:
 PresetReadEp:
     MOV     Ep_Mode,A
     MOV     A,@C_ReadEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime
+    CALL    WaitTxTime_Mode
 ReadEpromData:
     MOV     A,Buf_EpAddr
     MOV     PrgTmp2,A
