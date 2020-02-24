@@ -37,7 +37,7 @@ F_WDevAddr          equ      6
 ;  地址 02 ，设置是否保存测试数据    
     C_E2Addr_Config             ==   0x03
     C_E2Addr_TData              ==   0x08   ; 发送数据保存
-    C_E2Addr_RData              ==   0x17   ; 接收数据保存
+    C_E2Addr_RData              ==   0x18   ; 接收数据保存
     C_EpAddr_RxChannel          ==   0x20           ; 接收信道参数
                                 ; 0x20    RX addr1
                                 ; 0x21    RX addr2
