@@ -330,6 +330,184 @@ ClearKeyFlag:                       ; 按键标志2个，B_KeyDown，B_KeyDown3s可清除
     AND     IntKeyValue,A
     RET
 
+;************************************************
+;  接收转为发送模式，因为发送即时完成，需要等待接收端准备好才可以发送，
+;  所以需要加入等待时间
+;      发送转接收不需要等待时间
+PresetRx2Tx:
+    MOV     A,@5
+    CALL    SetQuitTime_ms          ; 等待时间最少32ms     
+    MOV     A,@C_WaitRx2TxEnd
+    MOV     TRMode,A
+WaitRx2TxEnd:
+    DJZA    QuitTime
+    JMP     main      
+    JMP     _TxCode4B+1
+;*************************************************
+IdlePress5Key:
+PresetTxData:
+    SWAPA   ChannelNums             ; 根据 ChannelNums -- 转为 TxCh 地址，设置发送信道 
+    ADD     A,@C_EpAddr_TxChannel-0x10
+    JBC     TRFlagReg,F_Config
+    MOV     A,@C_E2Addr_Config      ; Config地址
+
+    CALL    SetEpParamCh0
+    MOV     A,@C_ReadEp_TxCode4B
+    JMP     PresetReadEp
+_TxCode4B:
+    CALL    BufferInitTx            ; 设置信道数据
+
+    BC      P_CE,B_CE               ; Standby 模式
+    CALL    SetSPI_CLRIRQ
+    MOV     A,@0x4E                 ; 发送/溢出中断，发送模式
+    CALL    SetSPI_CONFIG
+    CALL    SetSPI_FLUSH_TX         ; 清除SPI缓冲区
+
+    JMP     _SetTxDataTable         ; 去设置打包数据包
+
+_SetTxDataEnd:
+    CALL    SetSPIDataParam
+    MOV     A,@WR_TX_PLOAD    
+    CALL    SPI_Write_Buf           ; 装载数据
+
+    BS      P_CE,B_CE               ; 激励发射
+
+    MOV     A,@C_WaitTxDataEnd      ; 
+    CALL    WaitTxTime_Mode         ; 设置发送等待时间
+    CALL    ClrFailFlag
+;************************************************
+;// WaitTxDataEnd 等待发送信道码完成，变为接收模式
+WaitTxDataEnd:
+    JBC     P_IRQ,B_IRQ
+    JMP     $+5
+
+    CALL    SPI_READSTATUS
+    JBC     PrgTmp3,TX_DS
+    JMP     _SaveTestTData
+    JMP     $+3
+
+    DJZA    QuitTime
+    JMP     main
+    BS      EpNum,F_TFail           ; 发送失败
+_SaveTestTData:
+    CALL    SetEp_TData
+    MOV     A,@C_SaveEp_TData       ;保存测试数据
+    JBC     TRFlagReg,F_EpTRData
+    JMP     PresetSaveEp
+
+_SetTxData_SaveTData:
+    JBS    EpNum,F_TFail
+    JMP     _TxDataEndTable         ; 数据发送成功
+    JMP     _TxFailTable			; 超次数重发
+;************************************************
+;//MARK: 接收数据进程
+PresetRxData:
+    MOV     A,@C_EpAddr_RxChannel
+    JBC     TRFlagReg,F_Config
+    MOV     A,@C_E2Addr_Config
+    CALL    SetEpParamCh0
+    MOV     A,@C_ReadEp_RxCode4B
+    JMP     PresetReadEp            ; 读接收信道码 4B
+
+_RxCode4B:
+    CALL    BufferInitTx            ; 设置接收参数
+_Tx2Rx:
+PresetTx2Rx:                        ; 发射转为接收模式
+    BC      P_CE,B_CE
+    CALL    SetSPI_CLRIRQ           ; 清除IRQ中断
+    MOV     A,@0x3F                 ; 接收中断，接收模式
+    CALL    SetSPI_CONFIG
+
+    CALL    SetSPI_FLUSH_RX         ; 清除SPI接收缓冲区
+    BS      P_CE,B_CE      
+
+    JBS     TRFlagReg,F_Config
+    JMP     ResetKeyCnt
+
+    MOV     A,@C_WaitRxDataReturn
+    CALL    ResetQuitTime_Mode
+    CALL    ClrFailFlag
+;************************************************
+WaitRxDataReturn:                   ; 等待接收端返回节点数据
+    CALL    FLed_SlowBlink
+    DJZA    QuitTime
+    JMP     $+3
+    BS      EpNum,F_RFail
+    JMP     _SaveTestRData
+CheckRxIRQ:
+    JBC     P_IRQ,B_IRQ
+    JMP     main
+
+    BC      EpNum,F_RFail
+    CALL    ReadSpiData             ; 从SPI缓冲区读数据
+_SaveTestRData:    
+    CALL    SetEp_RData
+    MOV     A,@C_SaveEp_RData       ;保存测试数据
+    JBC     TRFlagReg,F_EpTRData
+    JMP     PresetSaveEp            ; 转到数据处理列表
+    
+_SetRxData_SaveRData:
+    JBS     EpNum,F_RFail
+    JMP     _RxDataEndTable         ; 接收到数据处理列表
+    JMP     _RxTimeOverTable
+;************************************************
+;//MARK:    保存EPROM进程
+PresetSaveEp:
+    MOV     Ep_Mode,A
+    MOV     A,@C_SaveEpromData
+    MOV     TRMode,A
+    CALL    SetWriteEpWaitTime      ; 设置保存EPROM时间
+SaveEpromData:
+    MOV     A,Buf_EpAddr
+    MOV     PrgTmp2,A
+    MOV     A,Buf_RamAddr
+    MOV     RamSelReg,A
+    MOV     A,Buf_RamSize
+    MOV     PrgTmp1,A
+    CALL    I2C_WritePageData
+    JBS     StatusReg,CarryFlag
+    JMP     _SaveSucessTable        ; EPROM 正常
+
+    DJZA    QuitTime
+    JMP     main   
+    JMP     _SaveFailTable
+;*************************************************
+;//MARK: 读EPROM进程
+PresetReadEp:
+    MOV     Ep_Mode,A
+    MOV     A,@C_ReadEpromData
+    MOV     TRMode,A
+    CALL    SetWriteEpWaitTime
+ReadEpromData:
+    MOV     A,Buf_EpAddr
+    MOV     PrgTmp2,A
+    MOV     A,Buf_RamAddr
+    MOV     RamSelReg,A
+    MOV     A,Buf_RamSize
+    MOV     PrgTmp1,A
+    CALL    I2C_ReadPageData
+    JBS     StatusReg,CarryFlag
+    JMP     _ReadSucessTable                    ; EPROM 正常，灯不闪
+
+    DJZA    QuitTime
+    JMP     main   
+    JMP     _ReadFailTable
+;***************************************************
+ClrFailFlag:
+    BC      EpNum,F_TFail
+    BC      EpNum,F_RFail
+    RET
+;************************************************
+Wait3us:
+    JBS     TRFlagReg,F_I2CSlow     ; I2C 速度慢，需要等待
+    RET
+    MOV     A,@60
+    ADD     A,@0xFF                     ; 3*A+5
+    JBS     StatusReg,ZeroFlag
+    JMP     $-2
+    RET
+;************************************************
+
 ;*********************************************************
 C_I2CSclIn_SdaOut   equ     C_I2CBusOut    +  (1<<B_SCL)
 C_I2CSclOut_SdaIn   equ     C_I2CBusOut    +  (1<<B_SDA) 
@@ -516,15 +694,16 @@ I2C_Stop:
     CALL    Wait3us    
     CALL    I2C_SCLi_SDAo               ; SCL=1, SDA=0
     CALL    Wait3us    
+    CALL    I2C_BusIn                   ; SCL=1, SDA=1
     BC      StatusReg,CarryFlag
-    JMP     I2C_BusIn                   ; SCL=1, SDA=1
-
+    RET
 ;*************************************************	
 ;   RamSelReg, 当前写的数据存放位置
 ;   Prgtmp1,  写的字节数
 ;   Prgtmp2,  EPROM 地址，单字节
 ;//TODO:I2C_WritePageData
 I2C_WritePageData:
+    BC      I2CAddr,0
 	CALL	I2C_Start
 	MOV		A,I2CAddr           
 	CALL	I2C_WriteCommand    	; 设备地址,使用tmp3,tmp4
@@ -593,181 +772,3 @@ _I2CCompPageLoop:
     BS      TRFlagReg,F_FindSame
     JMP     _I2CReadPageEnd
 ;********************************************************************    
-
-;************************************************
-;  接收转为发送模式，因为发送即时完成，需要等待接收端准备好才可以发送，
-;  所以需要加入等待时间
-;      发送转接收不需要等待时间
-PresetRx2Tx:
-    MOV     A,@5
-    CALL    SetQuitTime_ms          ; 等待时间最少32ms     
-    MOV     A,@C_WaitRx2TxEnd
-    MOV     TRMode,A
-WaitRx2TxEnd:
-    DJZA    QuitTime
-    JMP     main      
-    JMP     _TxCode4B+1
-;*************************************************
-IdlePress5Key:
-PresetTxData:
-    SWAPA   ChannelNums             ; 根据 ChannelNums -- 转为 TxCh 地址，设置发送信道 
-    ADD     A,@C_EpAddr_TxChannel-0x10
-    JBC     TRFlagReg,F_Config
-    MOV     A,@C_E2Addr_Config      ; Config地址
-
-    CALL    SetEpParamCh0
-    MOV     A,@C_ReadEp_TxCode4B
-    JMP     PresetReadEp
-_TxCode4B:
-    CALL    BufferInitTx            ; 设置信道数据
-
-    BC      P_CE,B_CE               ; Standby 模式
-    CALL    SetSPI_CLRIRQ
-    MOV     A,@0x4E                 ; 发送/溢出中断，发送模式
-    CALL    SetSPI_CONFIG
-    CALL    SetSPI_FLUSH_TX         ; 清除SPI缓冲区
-
-    JMP     _SetTxDataTable         ; 去设置打包数据包
-
-_SetTxDataEnd:
-    CALL    SetSPIDataParam
-    MOV     A,@WR_TX_PLOAD    
-    CALL    SPI_Write_Buf           ; 装载数据
-
-    BS      P_CE,B_CE               ; 激励发射
-
-    MOV     A,@C_WaitTxDataEnd      ; 
-    CALL    WaitTxTime_Mode         ; 设置发送等待时间
-    CALL    ClrFailFlag
-;************************************************
-;// WaitTxDataEnd 等待发送信道码完成，变为接收模式
-WaitTxDataEnd:
-    JBC     P_IRQ,B_IRQ
-    JMP     $+5
-
-    CALL    SPI_READSTATUS
-    JBC     PrgTmp3,TX_DS
-    JMP     _SaveTestTData
-    JMP     $+3
-
-    DJZA    QuitTime
-    JMP     main
-    BS      EpNum,F_TFail           ; 发送失败
-_SaveTestTData:
-    CALL    SetEp_TData
-    MOV     A,@C_SaveEp_TData       ;保存测试数据
-    JBC     TRFlagReg,F_EpTRData
-    JMP     PresetSaveEp
-
-_SetTxData_SaveTData:
-    JBS    EpNum,F_TFail
-    JMP     _TxDataEndTable         ; 数据发送成功
-    JMP     _TxFailTable			; 超次数重发
-;************************************************
-;//MARK: 接收数据进程
-PresetRxData:
-    MOV     A,@C_EpAddr_RxChannel
-    JBC     TRFlagReg,F_Config
-    MOV     A,@C_E2Addr_Config
-    CALL    SetEpParamCh0
-    MOV     A,@C_ReadEp_RxCode4B
-    JMP     PresetReadEp            ; 读接收信道码 4B
-
-_RxCode4B:
-    CALL    BufferInitTx            ; 设置接收参数
-_Tx2Rx:
-PresetTx2Rx:                        ; 发射转为接收模式
-    BC      P_CE,B_CE
-    CALL    SetSPI_CLRIRQ           ; 清除IRQ中断
-    MOV     A,@0x3F                 ; 接收中断，接收模式
-    CALL    SetSPI_CONFIG
-
-    CALL    SetSPI_FLUSH_RX         ; 清除SPI接收缓冲区
-    BS      P_CE,B_CE      
-
-    JBS     TRFlagReg,F_Config
-    JMP     ResetKeyCnt
-
-    MOV     A,@C_WaitRxDataReturn
-    CALL    ResetQuitTime_Mode
-    CALL    ClrFailFlag
-;************************************************
-WaitRxDataReturn:                   ; 等待接收端返回节点数据
-    CALL    FLed_SlowBlink
-    DJZA    QuitTime
-    JMP     $+3
-    BS      EpNum,F_RFail
-    JMP     _SaveTestRData
-CheckRxIRQ:
-    JBC     P_IRQ,B_IRQ
-    JMP     main
-
-    BC      EpNum,F_RFail
-    CALL    ReadSpiData             ; 从SPI缓冲区读数据
-_SaveTestRData:    
-    CALL    SetEp_RData
-    MOV     A,@C_SaveEp_RData       ;保存测试数据
-    JBC     TRFlagReg,F_EpTRData
-    JMP     PresetSaveEp            ; 转到数据处理列表
-    
-_SetRxData_SaveRData:
-    JBS     EpNum,F_RFail
-    JMP     _RxDataEndTable         ; 接收到数据处理列表
-    JMP     _RxTimeOverTable
-;************************************************
-;//MARK:    保存EPROM进程
-PresetSaveEp:
-    MOV     Ep_Mode,A
-    MOV     A,@C_SaveEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime      ; 设置保存EPROM时间
-SaveEpromData:
-    MOV     A,Buf_EpAddr
-    MOV     PrgTmp2,A
-    MOV     A,Buf_RamAddr
-    MOV     RamSelReg,A
-    MOV     A,Buf_RamSize
-    MOV     PrgTmp1,A
-    CALL    I2C_WritePageData
-    JBS     StatusReg,CarryFlag
-    JMP     _SaveSucessTable        ; EPROM 正常
-
-    DJZA    QuitTime
-    JMP     main   
-    JMP     _SaveFailTable
-;*************************************************
-;//MARK: 读EPROM进程
-PresetReadEp:
-    MOV     Ep_Mode,A
-    MOV     A,@C_ReadEpromData
-    MOV     TRMode,A
-    CALL    SetWriteEpWaitTime
-ReadEpromData:
-    MOV     A,Buf_EpAddr
-    MOV     PrgTmp2,A
-    MOV     A,Buf_RamAddr
-    MOV     RamSelReg,A
-    MOV     A,Buf_RamSize
-    MOV     PrgTmp1,A
-    CALL    I2C_ReadPageData
-    JBS     StatusReg,CarryFlag
-    JMP     _ReadSucessTable                    ; EPROM 正常，灯不闪
-
-    DJZA    QuitTime
-    JMP     main   
-    JMP     _ReadFailTable
-;***************************************************
-ClrFailFlag:
-    BC      EpNum,F_TFail
-    BC      EpNum,F_RFail
-    RET
-;************************************************
-Wait3us:
-    JBS     TRFlagReg,F_I2CSlow     ; I2C 速度慢，需要等待
-    RET
-    MOV     A,@60
-    ADD     A,@0xFF                     ; 3*A+5
-    JBS     StatusReg,ZeroFlag
-    JMP     $-2
-    RET
-;************************************************

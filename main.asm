@@ -36,14 +36,16 @@ _BitTable:
     RETL    @1<<6
     RETL    @1<<7
 
+    C_ResetTableSize    ==  5
 _RxChannelTable:
     DECA    SetMode
     ADD     PC,A
     JMP     _ResetTable1
     JMP     _ResetTable2
     JMP     _ResetTable3
-
-_ResetTable4:           ; 发送信道
+    JMP     _ResetTable4
+;   JMP     _ResetTable5
+_ResetTable5:           ; 发送信道
     MOV     A,PrgTmp2
     ADD     PC,A
     RETL    @0xB1       ; 信道码 01      
@@ -60,7 +62,7 @@ _ResetTable1:           ; 接收参数，系统参数
     RETL    @0x02       ; RF-CH      
 if EMulater == 0
     RETL    @0x01       ; 发送信道数
-    RETL    @0x01       ; 设置开关数
+    RETL    @0x02       ; 设置开关数
 else
     RETL    @0x00       ; 发送信道数
     RETL    @0x00       ; 设置开关数
@@ -82,18 +84,28 @@ _ResetTable3:           ; 开关参数
     RETL    @0xB6       ; I2C地址
     RETL    @0x0F       ; 开关开值
 
+_ResetTable4:           ; 开关参数
+    MOV     A,PrgTmp2
+    ADD     PC,A
+    RETL    @0x01       ; 节点1，
+    RETL    @0x02       ; 按键值=1
+    RETL    @0xFF       ; I2C地址
+    RETL    @0xFF       ; 开关开值
+    
 _ResetAddrTable:
     DECA    SetMode
     ADD     PC,A
     RETL    @C_EpAddr_RxChannel
     RETL    @C_E2Addr_Config
     RETL    @C_EpAddr_SWNodeKey
+    RETL    @C_EpAddr_SWNodeKey+0x10
     RETL    @C_EpAddr_TxChannel
 
 _ResetSizeTable:
     DECA    SetMode
     ADD     PC,A
     RETL    @6
+    RETL    @4
     RETL    @4
     RETL    @4
     RETL    @4
@@ -734,7 +746,7 @@ ConfirmReset:
     JBS     IntKeyValue,B_KeyDown3s
     JMP     WaitTimeOverLedOff          ; 超时退到 PresetRxData
 
-    MOV     A,@4
+    MOV     A,@C_ResetTableSize
     MOV     SetMode,A
 _ConfirmResetNext:
     CALL    _ResetSizeTable
