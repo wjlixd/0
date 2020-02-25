@@ -342,10 +342,10 @@ _IdleChkKeyUp:
     JMP     _IdleChkKey3s
 
     DJZA    KeyTime
-    JMP     main
+    JMP     _IdleChkKey3s
 
     JBS     IntKeyValue,B_KeyUp
-    JMP     main
+    JMP     _IdleChkKey3s
 
     MOV     A,@2
     SUB     A,SetMode
@@ -822,6 +822,8 @@ WaitBlinkEnd:
     JBC     TRFlagReg,F_250ms   ; ¿ìÉÁ
     XOR     P_LED,A
     BC      TRFlagReg,F_250ms
+    JBS     IntKeyValue,B_KeyUp
+    JMP     main
 ;//MARK: WaitTimeOver
 WaitTimeOverLedOff:                 ; µÈ´ý³¬Ê±,LEDÏ¨Ãð
     DJZA    QuitTime
