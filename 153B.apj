@@ -8,8 +8,7 @@ BlockNum=0
 [EEPROMBlock]
 BlockNum=0
 [BREAKPOINT]
-BP Num=1
-BP0=1,A,1242244,1,64211628,374,$\main.asm
+BP Num=0
 [CODEOPTION]
 Option Num=9
 Target Power=1
@@ -47,11 +46,11 @@ File0=$\main.asm
 File Num=8
 File0=$\DEFMCU.H
 File1=$\OPTION.H
-File2=$\MACRO.H
-File3=$\PUBLIC2018.H
-File4=$\PORTDEF.H
-File5=$\CONSTDEF.H
-File6=$\RAMDEF.H
+File2=$\PUBLIC.H
+File3=$\PORTDEF.H
+File4=$\MACRO.H
+File5=$\RAMDEF.H
+File6=$\CONSTDEF.H
 File7=$\MINI4X8LED.H
 [List Files]
 File Num=1
