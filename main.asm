@@ -102,6 +102,7 @@ main:
     JMP     main
 
 _InitUartTx:
+    DISI
     BS      SystemFlag,F_TxD
     MOV     A,@CtrlByte+1
     MOV     TxBufPtr,A
@@ -174,8 +175,7 @@ _IntTx_Start:
     MOV     TxData,A
     INC     TxBufPtr
 
-    INC     TxStep
-    JMP     _IntTccEnd
+    JMP     _IntNextStep
 
 _IntTx_Bit:
     JBC     TxData,0
@@ -183,13 +183,11 @@ _IntTx_Bit:
     JBS     TxData,0
     BC      Tx_Port,Tx_B
     RRC     TxData
-    INC     TxStep
-    JMP     _IntTccEnd
+    JMP     _IntNextStep
 
 _IntTx_Stop:
     BS      Tx_Port,Tx_B
-    INC     TxStep
-    JMP     _IntTccEnd
+    JMP     _IntNextStep
 
 _IntTx_StopEnd:
     CLR     TxStep
@@ -200,6 +198,8 @@ _IntTx_Over:
     CLRA
     IOW    IOCF                     ; 关闭中断
 
+_IntNextStep:
+    INC     TxStep
 _IntTccEnd:
     BCTCIF                          ; 清除中断标志   
     POPStack

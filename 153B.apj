@@ -9,7 +9,7 @@ BlockNum=0
 BlockNum=0
 [BREAKPOINT]
 BP Num=1
-BP0=1,A,1242244,1,64211628,46,$\main.asm
+BP0=1,A,1242244,1,63163052,88,$\main.asm
 [CODEOPTION]
 Option Num=9
 Target Power=1
@@ -32,7 +32,7 @@ TRACELOGSOURCE=0
 [ADDRESSBP]
 AddrBP Num=0
 [INTERRUPT]
-INTERRUPT=1
+INTERRUPT=0
 [AGENT]
 AGENT=0
 [LibraryProject]
