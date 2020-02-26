@@ -7,9 +7,9 @@ IntTemp             equ     PrgTmp3             ; 端口变化量，可与 PrgTmp 共用
 
 SystemFlag          equ     Inttmp3             ; 保存当前端口状态值
 
-PrgTmp5             equ     0x18
-PrgTmp6             equ     PrgTmp5      +   1
-I2CStep             equ     PrgTmp6      +   1  ;
+;PrgTmp5             equ     0x18
+;PrgTmp6             equ     PrgTmp5      +   1
+I2CStep             equ     0x18; PrgTmp6      +   1  ;
 StepBak             equ     I2CStep      +   1  ;
 DataPtr             equ     StepBak      +   1  ;
 CLKS                equ     DataPtr      +   1  ;

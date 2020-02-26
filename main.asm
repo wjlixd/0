@@ -1,4 +1,8 @@
-
+;   I2C 从设备地址  F6FE
+;   接收数据，转发到UART TX ，电脑UART接收， 给上海公司做的电机数据采集
+;   2020、02.27   CHKSUM: EC7C
+; 
+; 
 include "defmcu.h"
 include	"option.h"
 include "public.h"
@@ -10,14 +14,6 @@ include	"Mini4X8LED.H"
 ;****************************************************************
 
 /*       
-   chksum:    Relay4Board
-0、 5A0B  - 0  - 使用单继电器模块，EPROM选地址，无晶振 ,小继电器，HF49FD，大继电器, SRD-05VDC-SL-C
-1、 73D2  - 1    使用4继电器模块， EPROM选地址，带晶振 , 老版本PCB -2018
-2、 73D4  - 2  - 使用4继电器模块， EPROM选地址，带晶振 ，新版本PCB -2019
-3、 C113  - 3  - 使用单继电器模块，IO端口选地址，无晶振, SOP14 
-4、 4D52  - 4  - 使用单继电器模块，IO端口选地址，无晶振, SOP8  
-
-5、 588A  - 0    使用单继电器模块，EPROM选地址，无晶振 ,大继电器,    PCB版本 2019.05.10 SlaverSDA/SlaverSCL脚位调换    
 
 	OTP 选项：
 	Target Power    	:    Using ICE
@@ -25,7 +21,7 @@ include	"Mini4X8LED.H"
 	Setup Time  		:    18ms
 	OSC  				:    IRC
 	CLKS   				:    2Clocks
-	ENWDT				:    Disable 
+	ENWDT				:    EN 
 	ResetEN  			:    Disable 
 */
 
@@ -64,12 +60,8 @@ include	"Mini4X8LED.H"
 DefaultContrast:
 	RETL	@3
 DefaultDevAddr:
-GroupID:                        ; 默认 OPT3 初始值
-    RETL    @0xF6               ; 12位
+    RETL    @0xF6               ; 
     RETL    @0xFE
-    ; RETL    @0xF0   + (1<<1)    ; 10位地址格式， 高2位
-    ; RETL    @0x38               ; 10位地址格式， 低8位
- 
 
 
     M_I2CSlaver201911
@@ -96,10 +88,8 @@ main:
 
     MOV     A,@DataBufEnd-CtrlByte+1
     SUB     A,CtrlByte
-    JBS     StatusReg,CarryFlag
-    JMP     _InitUartTx
-    CLR     CtrlByte
-    JMP     main
+    JBC     StatusReg,CarryFlag
+    JMP     Tx2I2CInit
 
 _InitUartTx:
     DISI
@@ -143,16 +133,19 @@ McuRst:
 	AND		A,@I2CSMask
 	MOV		SystemFlag,A            			;起动后首先读 I2C 端口数据，初始化
     BS      SystemFlag,F_SDAInput
-    MOV     A,@0xA0
-    MOV     PrgTmp5,A
-    MOV     A,@0xFF
-    MOV     PrgTmp6,A
 
     CALL    DefaultDevAddr
     MOV     DevAddrByte,A
+    MOV     CtrlByte+1,A                        ; 复位后显示  30H
+
     CALL    DefaultDevAddr+1
     MOV     DevAddrByte+1,A
-    JMP     main
+    MOV     CtrlByte+2,A                        ; 复位后显示  30H
+
+    MOV     A,@02
+    MOV     CtrlByte,A
+
+    JMP     _InitUartTx
 
 ;***************************************** 
 ; 主设备通过06,07地址修改了设备地址，需要保存在EPROM中
@@ -178,11 +171,11 @@ _IntTx_Start:
     JMP     _IntNextStep
 
 _IntTx_Bit:
-    JBC     TxData,0
-    BS      Tx_Port,Tx_B
-    JBS     TxData,0
-    BC      Tx_Port,Tx_B
     RRC     TxData
+    JBS     StatusReg,CarryFlag
+    BC      Tx_Port,Tx_B
+    JBC     StatusReg,CarryFlag
+    BS      Tx_Port,Tx_B
     JMP     _IntNextStep
 
 _IntTx_Stop:
@@ -209,9 +202,13 @@ _IntTccEnd:
 ChkTxEnd:
     JBS     SystemFlag,F_TxEnd
     JMP     main    
-
+Tx2I2CInit:
     BC      SystemFlag,F_TxD        ; 转为读I2C总线
     BC      SystemFlag,F_DataValid  ; 清除数据有效位
-    JMP     Error_DevAddrDiff       ; STEP= 0,设置端口，10位地址匹配清除
+    MOV     A,@~( 1<<F_TxD | 1<< F_DataValid | 1<<F_AddrMarried   )
+    AND     SystemFlag,A
+    CLR     I2CStep
+    JMP     main
+    ; JMP     Error_DevAddrDiff       ; STEP= 0,设置端口，10位地址匹配清除
 
 ;**********************************************************************
