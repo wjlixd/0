@@ -43,10 +43,11 @@ include	"Mini4X8LED.H"
 
 
 	ORG     0x08
+    PUSHStack
     MOV     A,@~C_UartTcc
     MOV     TCC,A
 
-    MOV     A,RxStep
+    MOV     A,TxStep
     ADD     PC,A         
     JMP     _IntTx_Start        ;0
     JMP     _IntTx_Bit          ;1
@@ -64,12 +65,14 @@ DefaultContrast:
 	RETL	@3
 DefaultDevAddr:
 GroupID:                        ; 默认 OPT3 初始值
-    RETL    @0xB0             ; 12位
-    RETL    @0xFF
+    RETL    @0xF6               ; 12位
+    RETL    @0xFE
     ; RETL    @0xF0   + (1<<1)    ; 10位地址格式， 高2位
     ; RETL    @0x38               ; 10位地址格式， 低8位
  
 
+
+    M_I2CSlaver201911
 
 ;*****************************************
 ;//todo: main
@@ -77,23 +80,55 @@ IntPortEnd:
 main:
 	WDTC
 
+    JBC     SystemFlag,F_TxD
+    JMP     ChkTxEnd
+
 	JBS		SystemFlag,F_DataValid
 	JMP		IntPort
 	
 	BC		SystemFlag,F_DataValid               ; I2C总线接收到 继电器状态改变后，做出动作
     JBC     SystemFlag,F_WDevAddr
     CALL    UpdatDevAddr
-
-    C_CtrlMask    ==   0x01
-    
+  
 	MOV     A,CtrlByte
+    JBC     StatusReg,ZeroFlag
+    JMP     main
+
+    MOV     A,@DataBufEnd-CtrlByte+1
+    SUB     A,CtrlByte
+    JBS     StatusReg,CarryFlag
+    JMP     _InitUartTx
     CLR     CtrlByte
-    AND     A,@C_CtrlMask
-    ADD     PC,A
-    JMP     main                                ; 0
-    JMP     RelayAction                         ; 1
-    
-    M_I2CSlaver201911
+    JMP     main
+
+_InitUartTx:
+    BS      SystemFlag,F_TxD
+    MOV     A,@CtrlByte+1
+    MOV     TxBufPtr,A
+
+    MOV     A,@CtrlByte
+    ADD     A,CtrlByte
+    MOV     TxBufEndPtr,A
+
+    MOV     A,@C_UartCont           ;设置中断时间
+    CONTW
+    MOV     A,@~C_UartTcc
+    MOV     TCC,A
+
+    MOV     A,@TccMask              ; 设置TCC中断允许
+    IOW     IOCF
+    CLRA                            ; 清除中断标志
+    MOV     IntFlag,A   
+
+    CLR     TxStep                  ; 开始发送
+
+    BC      SystemFlag,F_TxEnd
+    ENI
+    JMP     main
+
+
+
+
 
 ;//todo: McuRst
 McuRst:
@@ -112,152 +147,17 @@ McuRst:
     MOV     A,@0xFF
     MOV     PrgTmp6,A
 
-if  0
-    I2CWaitTime ==  0x20
-
     CALL    DefaultDevAddr
     MOV     DevAddrByte,A
     CALL    DefaultDevAddr+1
     MOV     DevAddrByte+1,A
-
-    MOV     A,@0xF2
-    MOV     PrgTmp5,A
-    MOV     A,@0x39
-    MOV     PrgTmp6,A
-
-    MOV     A,@C_DevBufSize
-    MOV     PrgTmp1,A
-    MOV     A,@1
-    MOV     Prgtmp2,A
-    MOV     A,@DevAddrByte
-    MOV     RamSelReg,A
-    CALL    I2C_WritePageData
-
- 
-    MOV     A,@C_DevBufSize
-    MOV     PrgTmp1,A
-    MOV     A,@1
-    MOV     Prgtmp2,A
-    MOV     A,@0x20
-    MOV     RamSelReg,A
-    CALL    I2C_ReadPageData
-    JMP     $
-endif
-
-if  Relay4Board<3
-    MOV     A,@C_DevBufSize
-    MOV     PrgTmp1,A
-    MOV     A,@C_E2Addr_DevAddr
-    MOV     PrgTmp2,A
-    MOV     A,@DevAddrByte
-    MOV     RamSelReg,A
-    CALL    I2C_ReadPageData                      ; 检查EPROM是否有数据，如果EPROM地址正确，使用EPROM，否则读OPT端口
-
-    CALL    ChkDevAddrError
-    JBS     StatusReg,CarryFlag
     JMP     main
-_EpromError:
-    CALL    DefaultDevAddr
-    MOV     DevAddrByte,A
-    CALL    DefaultDevAddr+1
-    MOV     DevAddrByte+1,A
-endif
-
-if Relay4Board == 3                                          ; 153B  SOP14 封装
-    CLR     DevAddrByte
-    JBC     Port6,2
-    BS      DevAddrByte,1
-
-    JBC     Port6,3
-    BS      DevAddrByte,2
-
-    JBC     Port6,4
-    BS      DevAddrByte,3
-
-    JBC     Port6,5
-    BS      DevAddrByte,4
-
-    JBC     Port6,6
-    BS      DevAddrByte,5
-
-    JBC     Port6,7
-    BS      DevAddrByte,6
-
-    JBC     Port5,0
-    BS      DevAddrByte,7
-
-endif
-
-if Relay4Board == 4                        
-	CALL	GroupID
-	MOV	    DevAddrByte,A
-
-    JBC     Port6,2
-    BS      DevAddrByte,1
-
-    JBC     Port6,3
-    BS      DevAddrByte,2
-
-    JBC     Port6,4
-    BS      DevAddrByte,3   
-endif
-    JMP     main
-
-
-RelayAction:
-	JBC		RelayStatus,F_RlyOn
-	BS		Relay1Port,Relay_B1
-	JBS		RelayStatus,F_RlyOn
-	BC		Relay1Port,Relay_B1
-if (Relay4Board==1) ||(Relay4Board==2)
-	JBC		RelayStatus,F_RlyOn1
-	BS		Relay2Port,Relay_B2
-	JBS		RelayStatus,F_RlyOn1
-	BC		Relay2Port,Relay_B2
-
-	JBC		RelayStatus,F_RlyOn2
-	BS		Relay3Port,Relay_B3
-	JBS		RelayStatus,F_RlyOn2
-	BC		Relay3Port,Relay_B3
-
-	JBC		RelayStatus,F_RlyOn3
-	BS		Relay4Port,Relay_B4
-	JBS		RelayStatus,F_RlyOn3
-	BC		Relay4Port,Relay_B4
-endif
-    JMP     main
-
 
 ;***************************************** 
 ; 主设备通过06,07地址修改了设备地址，需要保存在EPROM中
 UpdatDevAddr:
-if  Relay4Board<3
-    BC      SystemFlag,F_WDevAddr
-    CLR     CtrlByte
-    MOV     A,@DevAddrByte+1
-    SUB     A,DataPtr
-    JBS     StatusReg,CarryFlag
     RET
-
-    MOV     A,@0xA0
-    MOV     PrgTmp5,A
-    MOV     A,@0xFF
-    MOV     PrgTmp6,A
-
-    MOV     A,@C_DevBufSize
-    MOV     PrgTmp1,A
-    MOV     A,@C_E2Addr_DevAddr
-    MOV     PrgTmp2,A
-    MOV     A,@DevAddrByte
-    MOV     RamSelReg,A
-    JMP     I2C_WritePageData      ; 保存
-else
-    RET
-endif
 ;***************************************** 
-
-    M_I2CMaster201911
-
 
 
 _IntTx_Start:
@@ -296,34 +196,22 @@ _IntTx_StopEnd:
     JMP     _IntTccEnd
 
 _IntTx_Over:
-    BS      SysFlag,F_TxEnd
+    BS      SystemFlag,F_TxEnd
     CLRA
     IOW    IOCF                     ; 关闭中断
 
 _IntTccEnd:
-    BCTCIF                          ; 清除中断标志
-_IntEnd:    
+    BCTCIF                          ; 清除中断标志   
     POPStack
     reti
 
-
-Tx_SetUartInt:
-    MOV     A,@C_TxMode             ; 设置 UART 发送模式
-    MOV     OpMode,A
-
-    MOV     A,@C_UartCont           ;设置中断时间
-    CONTW
-    MOV     A,@~C_UartTcc
-    MOV     TCC,A
-
-    MOV     A,@TccMask              ; 设置TCC中断允许
-    IOW     IOCF
-    CLRA                            ; 清除中断标志
-    MOV     IntFlag,A   
-
-    CLR     TxStep
-
-    BC      SysFlag,F_TxEnd
-    ENI
-
+;**********************************************************************
+ChkTxEnd:
+    JBS     SystemFlag,F_TxEnd
     JMP     main    
+
+    BC      SystemFlag,F_TxD        ; 转为读I2C总线
+    BC      SystemFlag,F_DataValid  ; 清除数据有效位
+    JMP     Error_DevAddrDiff       ; STEP= 0,设置端口，10位地址匹配清除
+
+;**********************************************************************

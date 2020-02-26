@@ -5,10 +5,11 @@
 ;PrgTmp4			equ		0x13
 IntTemp             equ     PrgTmp3             ; 端口变化量，可与 PrgTmp 共用
 
-PrgTmp5             equ     0x14
+SystemFlag          equ     Inttmp3             ; 保存当前端口状态值
+
+PrgTmp5             equ     0x18
 PrgTmp6             equ     PrgTmp5      +   1
-SystemFlag          equ     PrgTmp6      +   1  ; 保存当前端口状态值
-I2CStep             equ     SystemFlag   +   1  ;
+I2CStep             equ     PrgTmp6      +   1  ;
 StepBak             equ     I2CStep      +   1  ;
 DataPtr             equ     StepBak      +   1  ;
 CLKS                equ     DataPtr      +   1  ;
@@ -22,3 +23,9 @@ RelayStatus         equ     CtrlByte     +   1
 ReadID              equ     DevAddrByte  +   1
 
 DataBufEnd          equ     0x2F
+
+
+TxStep              ==      I2CStep
+TxBufPtr            ==      StepBak
+TxBufEndPtr         ==      DataPtr
+TxData              ==      Data

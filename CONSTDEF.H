@@ -9,6 +9,12 @@
     
     F_WDevAddr  equ     4   
 	F_DataValid equ     6  
+    F_TxD       equ     7
+
+
+    F_TxEnd     ==      6
+    
+
 ;RelayStatus
 	F_RlyOn		equ		0		; ¼ÌµçÆ÷×´Ì¬
     F_RlyOn1    equ     1
@@ -22,3 +28,9 @@
 	C_DefaultAddrBits ==    10
 	C_MinAddrBits     ==    2
 	C_MaxAddrBits     ==    40
+
+
+
+    C_UartTcc      == 77
+    C_UartTcc1P5   == 115
+    C_UartCont == 0b01000010;  
