@@ -56,7 +56,7 @@ File Num=1
 File0=$\main.lst
 [Map Files]
 File Num=1
-File0=$\153B.map
+File0=?
 [Library Files]
 File Num=0
 [BOOKMARK]
@@ -108,7 +108,3 @@ Size#1=0
 Size#2=0
 [ICEVOLTAGE SETTING]
 Voltage=1
-[$\CONSTDEF.H]
-Rectangle=0066 0066 0718 0509
-Iconized=0
-Maximized=1
