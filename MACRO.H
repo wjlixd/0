@@ -1520,94 +1520,6 @@ WaitTime:
 	JMP		$-1
 	RET		
 */
-InitPort20191229	macro
-; 增加 EM78F734仿真EM78P153
-if MCU == 0
-	MOV		A,@~PortPL_Init
-	IOW		IOCB			; 153 ,下拉到地电阻禁止
-	MOV		A,@OpenDrain_Init
-	IOW		IOCC			;     OD开路	
-
-	MOV		A,@~PortPH_Init	; 153  上拉到VCC电阻控制，0-使能，1-禁止
-	IOW		IOCD
-	
-	MOV		A,@WDT_P60_Init ;
-	IOW		IOCE			; 禁止WDT，P60做IO口	
-
-	MOV		A,@P6_IO_Init
-	IOW		Port6
-	MOV		A,@P6_R_Init
-	MOV		Port6,A
-
-	MOV		A,@P5_IO_Init
-	IOW		Port5
-	MOV		A,@P5_R_Init
-	MOV		Port5,A
-
-	MOV		A,@CONT_Init;
-	CONTW
-  
-	MOV		A,@IntMask
-	IOW		IOCF
-	
-    CLRA
-    MOV     RF,A
-else	
-	MOV     A,@~P6P5PL_Init
-	IOW     IOCB					; [P6,P5] 下拉到地电阻设置
-	BANK    @3
-	MOV     A,@~Port7PL_Init
-	MOV     RF,A					; [P7 ] P7下拉到地电阻设置
-
-	MOV		A,@OpenDrain_Init
-	IOW		IOCC					;     OD开路	
-
-	MOV     A,@~Port6PH_Init
-	IOW     IOCD					; P6上拉到VDD电阻
-	BANK    @2
-	MOV     A,@~Port7PH_Init
-	MOV     RF,A					; [P7 ] 上拉到VDD电阻
-
-	MOV		A,@WDT_P60_Init ;
-	IOW		IOCA					; 禁止WDT，P60做IO口	
-
-	BANK    @0
-	MOV		A,@P7_IO_Init
-	IOW		Port7
-	MOV		A,@P7_R_Init
-	MOV		Port7,A
-
-	MOV		A,@P6_IO_Init
-	IOW		Port6
-	MOV		A,@P6_R_Init
-	MOV		Port6,A
-
-	MOV		A,@P5_IO_Init
-	IOW		Port5
-	MOV		A,@P5_R_Init
-	MOV		Port5,A
-
-	MOV		A,@CONT_Init;
-	CONTW
-  
-	MOV		A,@IntMask					; 中断屏蔽 1
-	IOW		IOCF
-	
-	MOV     A,@IntMask1					; 中断屏蔽 2
-	IOW     IOCE
-
-	BANK    @1							; 中断标志2
-	MOV     A,@0x80
-	MOV     0x08,A						; IRC 频率设置为8M,  R8 = 0X80
-
-    CLRA
-    MOV     RF,A
-	BANK    @0							; 中断标志1
-    MOV     RF,A
-	
-endif
-
-endm
 
 
 InitPort20190828	macro
@@ -2026,35 +1938,6 @@ ClrRam  macro
 	JMP		$-3
 	CLR		RamSelReg
 endm 
-
-M_ClrBankRam  macro
-ClrBankRam:
-	MOV		A,@0x11
-	MOV		RamSelReg,A
-	MOV		A,@15
-    CALL    $+10
-
-    MOV     A,@0x20
-    CALL    $+6
-    MOV     A,@0x20+0x40
-    CALL    $+4
-    MOV     A,@0x20+0x40+0x40
-    CALL    $+2
-
-    MOV     A,@0x20+0x40+0x40+0x40
-
-    MOV     RamSelReg,A
-    MOV     A,@32
-    MOV     Prgtmp1,A
-
-	CLR		R0
-	INC		RamSelReg
-	DJZ		Prgtmp1
-	JMP		$-3
-
-    CLR     RamSelReg
-    RET
-endm    
 ;********************************
 ;*** EM78911***************  
 ;      复位地址 	：	00h
@@ -6152,6 +6035,9 @@ M_I2CSlaver201911  macro
 ;*****************************************
     I2CSMask		equ     (1<<SlaverSCL) + (1<<SlaverSDA) 
 
+C_Slaver_SCLi_SDAo  equ     C_SlaverBusOut  + (1<<SlaverSCL)
+C_Slaver_SCLo_SDAi  equ     C_SlaverBusOut  + (1<<SlaverSDA)
+C_Slaver_BusIn      equ     C_SlaverBusOut  + I2CSMask
 
             C_ChkDevAddr               ==   1      
             C_GetBroad1Byte            ==   C_ChkDevAddr         +  1      
@@ -6171,9 +6057,6 @@ IntPort:
 	MOV		A,I2CS_Port
 	XOR		A,SystemFlag
 	AND		A,@I2CSMask
-    JBC     StatusReg,ZeroFlag
-    JMP     IntPortEnd
-
 	MOV		IntTemp,A                        ; IntTemp为 端口当前检测到的变化位
 	XOR		SystemFlag,A                     ; SystemFlag 为端口当前值
  
@@ -6235,7 +6118,6 @@ Step_ChkDevAddr:                          ; 当前接收到的字节为 设备地址ADDR
     JMP     _Step_DevAddrOk
 ;*****************************************************************************************    
 ;            通过广播地址写设备地址， 00 - 01 - 【A1】【A2】
-    BS      SystemFlag,F_WDevAddr           ; 相比 Slaver程序，只是这里做了 **修改2**
     MOV     A,@C_GetBroad1Byte              ; 设备地址为 00，广播地址
 PreSetTxAckRcvByte:
     MOV     StepBak,A
@@ -6432,15 +6314,13 @@ FirstClkInput:                              ; SCL 为变为低电平时
     JMP     IntPortEnd
 SDAInput:
 _SlaverSDA_1:
-    IOR     I2CS_Port
-    OR      A,@I2CSMask                     ; SCL, SDA 设置为输入
+    MOV     A,@C_Slaver_BusIn               ; SCL, SDA 设置为输入
 	IOW		I2CS_Port
     BS      SystemFlag,F_SDAInput
 	JMP		IntPortEnd
 
 _SlaverSDA_0:
-    IOR     I2CS_Port
-    AND     A,@~(1<<SlaverSDA)              ; SCL 为输入， SDA 为输出
+    MOV     A,@C_Slaver_SCLi_SDAo           ; SCL 为输入， SDA 为输出
 	IOW		I2CS_Port
 	BC		I2CS_Port,SlaverSDA    
     BC      SystemFlag,F_SDAInput

@@ -1,7 +1,0 @@
-option.h
-public.h
-PortDef.h
-ConstDef.h
-RamDef.h
-main.asm
-com.asm
