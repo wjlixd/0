@@ -10,14 +10,7 @@ include	"Mini4X8LED.H"
 ;****************************************************************
 
 /*       
-   chksum:    Relay4Board
-0、 5A0B  - 0  - 使用单继电器模块，EPROM选地址，无晶振 ,小继电器，HF49FD，大继电器, SRD-05VDC-SL-C
-1、 73D2  - 1    使用4继电器模块， EPROM选地址，带晶振 , 老版本PCB -2018
-2、 73D4  - 2  - 使用4继电器模块， EPROM选地址，带晶振 ，新版本PCB -2019
-3、 C113  - 3  - 使用单继电器模块，IO端口选地址，无晶振, SOP14 
-4、 4D52  - 4  - 使用单继电器模块，IO端口选地址，无晶振, SOP8  
-
-5、 588A  - 0    使用单继电器模块，EPROM选地址，无晶振 ,大继电器,    PCB版本 2019.05.10 SlaverSDA/SlaverSCL脚位调换    
+   chksum:    
 
 	OTP 选项：
 	Target Power    	:    Using ICE
@@ -109,7 +102,318 @@ main:
     JMP     main                                ; 0
     JMP     RelayAction                         ; 1
     
-    M_I2CSlaver201911
+;**********************************************************
+;    M_I2CSlaver201911           ; I2C 主控程序
+;**********************************************************
+;  2019.11.6 更新，I2C Slaver , Master,支持7bit,10bit地址格式
+;     06-写设备地址， 07-读设备地址
+;*****************************************
+;使用 I2C Slaver 且注意：
+;   由于存在 列表，需要将 宏放在程序开始位置
+;   将 IntPortEnd 放在 main开始
+;*****************************************
+    I2CSMask		equ     (1<<SlaverSCL) + (1<<SlaverSDA) 
+
+C_Slaver_SCLi_SDAo  equ     C_SlaverBusOut  + (1<<SlaverSCL)
+C_Slaver_SCLo_SDAi  equ     C_SlaverBusOut  + (1<<SlaverSDA)
+C_Slaver_BusIn      equ     C_SlaverBusOut  + I2CSMask
+
+            C_ChkDevAddr               ==   1      
+            C_GetBroad1Byte            ==   C_ChkDevAddr         +  1      
+            C_ChkAddrByte2             ==   C_GetBroad1Byte      +  1      
+            C_GetByteAddr              ==   C_ChkAddrByte2       +  1      
+            C_WriteByte                ==   C_GetByteAddr        +  1      
+            C_PreTxByte                ==   C_WriteByte          +  1      
+            C_TxByte                   ==   C_PreTxByte          +  1      
+            C_ReadAck                  ==   C_TxByte             +  1      
+            C_TxAckRcvByte             ==   C_ReadAck            +  1      
+            C_RcvByte                  ==   C_TxAckRcvByte       +  1      
+            C_TxACK                    ==   C_RcvByte            +  1      
+
+
+;//todo: IntPort                               ;此为查询方式处理。I2C 协议，避免 maskter设备速度过快有些中断漏掉
+IntPort:
+	MOV		A,I2CS_Port
+	XOR		A,SystemFlag
+	AND		A,@I2CSMask
+	MOV		IntTemp,A                        ; IntTemp为 端口当前检测到的变化位
+	XOR		SystemFlag,A                     ; SystemFlag 为端口当前值
+ 
+    JBS     SystemFlag,F_SDAInput
+    JMP     ChkStartEnd 
+
+    JBS     SystemFlag,SlaverSCL            ; 在 SCL 高电平时
+    JMP     ChkStartEnd    
+
+	JBS		IntTemp,SlaverSDA               ; SDA 变化了
+	JMP		ChkStartEnd
+	
+	JBS		SystemFlag,SlaverSDA
+    JMP     _Step_RcvDevAddr                ; SDA 由高变低为 START,  GetStart:
+    JMP     _Step_GetStop
+
+ChkStartEnd:
+NextOpration:
+;//mark: 命令表
+    MOV     A,I2CStep
+    ADD     PC,A
+    JMP     IntPortEnd                      ; 等待接收 START ，或 STOP 空闲操作，只用于接收 START,STOP
+    JMP     Step_ChkDevAddr                 ;  
+    JMP     Step_GetBroad1Byte              ; 广播地址后第一字节， 01
+    JMP     Step_ChkAddrByte2               ; 10B 地址，第2字节
+    JMP     Step_GetByteAddr                ;  
+    JMP     Step_WriteByte                  ;  
+    JMP     Step_PreTxByte                  ;  
+    JMP     Step_TxByte                     ;  
+    JMP     Step_ReadAck                    ;    
+    JMP     Step_TxAckRcvByte               ;  
+    JMP     Step_RcvByte                    ;  
+    JMP     Step_TxACK                      ;  
+
+
+
+;*****************************************************************************************    
+_Step_RcvDevAddr:                          ; 接收到 START 后进行的操作
+    MOV     A,@C_ChkDevAddr
+    MOV     StepBak,A
+
+	MOV     A,@8
+	MOV     CLKS,A
+
+    MOV     A,@C_RcvByte
+    MOV     I2CStep,A
+    JMP     IntPortEnd
+;*****************************************************************************************    
+Step_ChkDevAddr:                          ; 当前接收到的字节为 设备地址ADDR
+    MOV     A,Data
+    AND     A,@0xFE
+    XOR     A,@0x06
+    JBS     StatusReg,ZeroFlag
+    JMP     _Step_Chk10BitAddr 
+
+
+; 接收到对设备地址操作，
+    JBC     Data,0
+    JMP     _Step_DevAddrOk
+;*****************************************************************************************    
+;            通过广播地址写设备地址， 00 - 01 - 【A1】【A2】
+    BS      SystemFlag,F_WDevAddr           ; 相比 Slaver程序，只是这里做了 **修改2**
+    MOV     A,@C_GetBroad1Byte              ; 设备地址为 00，广播地址
+PreSetTxAckRcvByte:
+    MOV     StepBak,A
+    MOV     A,@C_TxAckRcvByte
+    MOV     I2CStep,A
+    JMP     IntPortEnd
+;********************************************************
+Step_GetBroad1Byte:
+    MOV     A,@DevAddrByte
+    MOV     DataPtr,A
+    JMP     _Step_PreWriteByte
+
+;*****************************************************************************************    
+_Step_Chk10BitAddr:
+    MOV     A,Data
+    AND     A,@0xFE
+    XOR     A,DevAddrByte                   ; 接收到第一个设备地址字节
+    JBS     StatusReg,ZeroFlag
+    JMP     Error_DevAddrDiff
+
+    MOV     A,Data                          ; 高7位地址是相 同的
+    AND     A,@0xF8
+    XOR     A,@0xF0
+    JBS     StatusReg,ZeroFlag              ; 检查高5位是不是 F0
+    JMP     _Step_7BitAddr                  ; 是7位地址 ,则进入接收内部地址
+
+    JBS     Data,0                          ; 第一个设备地址高5位是 F0
+    JMP     $+4
+    JBS     SystemFlag,F_AddrMarried        ; 第一个设备地址 是10位，且最低位是1-读
+    JMP     Error_DevAddrDiff               ; 接收到10位地址，并不是自己的，
+    JMP     _Step_DevAddrOk                 ; 10位地址已经校验，需要读数据
+
+    MOV     A,@C_ChkAddrByte2               ; 进入接收10位地址 第二个字节
+    JMP     PreSetTxAckRcvByte
+
+Step_ChkAddrByte2:                        ; 检测10bit地址第2个字节
+    MOV     A,Data
+    XOR     A,DevAddrByte+1
+    JBS     StatusReg,ZeroFlag
+    JMP     Error_DevAddrDiff
+
+    BS      SystemFlag,F_AddrMarried        ; 检测到设备地址 是10位地址，相同
+    JMP     _Step_WriteByteAddr
+
+_Step_7BitAddr:                             ; 接收到地址是7bit地址
+    JBC     Data,0
+    JMP     _Step_DevAddrOk                 ; 读操作 ，7bit地址，读我操作
+_Step_WriteByteAddr:
+    MOV     A,@C_GetByteAddr                ; 向我写数据
+    JMP     PreSetTxAckRcvByte
+
+;*****************************************************************************************    
+Step_GetByteAddr:                           ; 接收到的是RAM地址
+    MOV     A,Data 
+    ADD     A,@DataBuf
+    MOV     DataPtr,A                       ; 设定数据指针
+_Step_PreWriteByte:
+    MOV     A,@C_WriteByte                  ; 
+	JMP     PreSetTxAckRcvByte              ; 接收到一个字节后，进入 Step06_WriteByte （向我写一个数据）
+	
+Step_WriteByte:                             ; 当前进入写数据操作
+    MOV     A,DataPtr
+    MOV     RamSelReg,A                     ; 置数据指针
+    MOV     A,Data
+    MOV     R0,A                            ; 保存数据
+
+    CALL    ChkDataPtrOverflow
+    JMP     _Step_PreWriteByte
+;*****************************************************************************************    
+_Step_DevAddrOk:            ;设备地址正确，从我读数据
+    MOV     A,@C_PreTxByte
+    MOV     StepBak,A
+    MOV     A,@C_TxAck
+    MOV     I2CStep,A
+    JMP     IntPortEnd
+
+Step_PreTxByte:
+	MOV     A,@8                            ; 操作为读命令，向主设备发送第一个数据
+	MOV     CLKS,A
+    MOV     A,DataPtr
+    MOV     RamSelReg,A
+    MOV     A,R0
+    MOV     Data,A                          ; 获得当前指针数据
+
+    CALL    ChkDataPtrOverflow
+
+    MOV     A,@C_TxByte
+    MOV     I2CStep,A
+    JMP     IntPortEnd
+;*****************************************
+Step_TxByte:                                ; 发送一个字节过程
+    JBS     IntTemp,SlaverSCL               ; SCL发生变化时
+    JMP     IntPortEnd
+
+	JBC		SystemFlag,SlaverSCL
+	JMP		_Step_TxByte_DatEnd
+
+	RLC		Data
+    JBC     StatusReg,CarryFlag             ; 发送数据
+    JMP     _SlaverSDA_1
+    JMP     _SlaverSDA_0
+
+_Step_TxByte_DatEnd:
+	DJZ		CLKS
+	JMP		IntPortEnd    
+    INC     I2CStep
+    JMP     IntPortEnd    
+;*****************************************
+Step_ReadAck:
+    JBS     IntTemp,SlaverSCL
+    JMP     IntPortEnd
+    
+	JBS		SystemFlag,SlaverSCL
+	JMP		SDAInput                        ; SCL 为低电平，改变 SDA为输入
+	JBC		SystemFlag,SlaverSDA            ; SCL 为高电平，
+	JMP		_Step_GetNoAck                  ; SDA 为高电平，则读到为 NO_ACK
+    JMP     Step_PreTxByte                  ; SDA 为低电平，则读到 RX_ACK ，准备发送下个数据
+
+;*****************************************
+Step_TxAckRcvByte:
+    JBS     IntTemp,SlaverSCL               ; SCL 发生变化时
+    JMP     IntPortEnd
+
+	JBS		SystemFlag,SlaverSCL            ; 
+	JMP		_SlaverSDA_0                    ; 发送ACK
+
+    INC     I2CStep
+	MOV     A,@8
+	MOV     CLKS,A
+    JMP     IntPortEnd
+
+Step_RcvByte:                               ; 接收一个字节过程
+    JBS     IntTemp,SlaverSCL               ; SCL 发生变化
+    JMP     IntPortEnd
+    
+	JBS		SystemFlag,SlaverSCL
+	JMP		FirstClkInput                   ; SCL为低电平，改变端口方向
+    
+	BC		StatusReg,CarryFlag             ; SCL为高电平，读入数据，保存在DATA中
+	JBC		SystemFlag,SlaverSDA
+	BS		StatusReg,CarryFlag             ; SCL为高电平，读入数据，保存在DATA中
+	RLC		Data
+	
+	DJZ		CLKS
+	JMP		IntPortEnd
+
+    JMP     _ReturnStep
+;*****************************************
+Step_TxACK:                                 ; 发送 TX_ACK 过程
+    JBS     IntTemp,SlaverSCL               ; SCL 发生变化时
+    JMP     IntPortEnd
+
+	JBS		SystemFlag,SlaverSCL            ; 
+	JMP		_SlaverSDA_0
+
+_ReturnStep:   
+    MOV     A,StepBak                       ; SCL为高电平时，返回操作
+    MOV     I2CStep,A
+    JMP     NextOpration
+;***************************************** 
+ChkDevAddrError:
+    JBC     DevAddrByte,0
+    BC      DevAddrByte,0
+
+    MOV     A,DevAddrByte
+    AND     A,@0xF0
+    JBC     StatusReg,ZeroFlag
+    JMP     _DevAddrError                   ; 高4位为0，则为保留地址，不允许
+
+    COMA    DevAddrByte
+    AND     A,@0xF8
+    JBC     StatusReg,ZeroFlag
+    JMP     _DevAddrError                   ; 高5位 = F8，保留地址
+    BC      StatusReg,CarryFlag
+    RET    
+
+_DevAddrError:
+    BS      StatusReg,CarryFlag
+    RET    
+
+
+ChkDataPtrOverflow:                         ; 地址加1 ，检测地址溢出
+    INC     DataPtr                         ; 数据指针向后移一个
+
+    MOV     A,@DataBufEnd+1                 ; 153B RAM最大2F，大于2F，重置BUF
+    SUB     A,DataPtr
+    MOV     A,@DataBuf                      ; 数据指针大于等于0X30，重新设定数据指针
+    JBC     StatusReg,CarryFlag
+    MOV     DataPtr,A
+    RET
+;*****************************************
+FirstClkInput:                              ; SCL 为变为低电平时
+    JBS     CLKS,3
+    JMP     IntPortEnd
+SDAInput:
+_SlaverSDA_1:
+    MOV     A,@C_Slaver_BusIn               ; SCL, SDA 设置为输入
+	IOW		I2CS_Port
+    BS      SystemFlag,F_SDAInput
+	JMP		IntPortEnd
+
+_SlaverSDA_0:
+    MOV     A,@C_Slaver_SCLi_SDAo           ; SCL 为输入， SDA 为输出
+	IOW		I2CS_Port
+	BC		I2CS_Port,SlaverSDA    
+    BC      SystemFlag,F_SDAInput
+    JMP     IntPortEnd
+;*****************************************
+_Step_GetStop:                              ; SDA 由低变高为 STOP
+    BS      SystemFlag,F_DataValid          ; 接收到STOP ，处理这一组数据
+_Step_GetNoAck:                             ; 读我结束
+Error_DevAddrDiff:      
+    CLR     I2CStep
+    BC      SystemFlag,F_AddrMarried        ; 10位地址匹配取消
+    JMP     _SlaverSDA_1
+;*****************************************
 
 ;//todo: McuRst
 McuRst:
