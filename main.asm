@@ -60,6 +60,34 @@ _KeyBitMask:
     RETL    @1<<B_Key4
     RETL    @1<<B_Key5
 
+; 关闭某个继电器
+_TurnOffRelayTable:
+    ADD     PC,A
+    BC      P_RLY1,B_RLY1
+    RET
+    BC      P_RLY2,B_RLY2
+    RET    
+    BC      P_RLY3,B_RLY3
+    RET
+    BC      P_RLY4,B_RLY4
+    RET        
+    BC      P_RLY5,B_RLY5
+    RET    
+
+_KeyScanTable:
+    ADD     PC,A
+    JMP     _KeyScanStep1
+    JMP     _KeyScanStep2
+    JMP     _KeyScanStep3
+    JMP     _KeyScanStep4
+    JMP     _KeyScanStep5
+    JMP     _KeyConfirmStep1
+    JMP     _KeyConfirmStep2
+    JMP     _KeyConfirmStep3
+    JMP     _KeyConfirmStep4
+    JMP     _KeyConfirmStep5
+    JMP     _KeyResetStep
+
 ;*****************************************
 ;//todo: main
 IntPortEnd:
@@ -101,39 +129,7 @@ McuRst:
     MOV     A,@0xFF
     MOV     PrgTmp6,A
 
-if  0
-    I2CWaitTime ==  0x20
 
-    CALL    DefaultDevAddr
-    MOV     DevAddrByte,A
-    CALL    DefaultDevAddr+1
-    MOV     DevAddrByte+1,A
-
-    MOV     A,@0xF2
-    MOV     PrgTmp5,A
-    MOV     A,@0x39
-    MOV     PrgTmp6,A
-
-    MOV     A,@C_DevBufSize
-    MOV     PrgTmp1,A
-    MOV     A,@1
-    MOV     Prgtmp2,A
-    MOV     A,@DevAddrByte
-    MOV     RamSelReg,A
-    CALL    I2C_WritePageData
-
- 
-    MOV     A,@C_DevBufSize
-    MOV     PrgTmp1,A
-    MOV     A,@1
-    MOV     Prgtmp2,A
-    MOV     A,@0x20
-    MOV     RamSelReg,A
-    CALL    I2C_ReadPageData
-    JMP     $
-endif
-
-if  Relay4Board<3
     MOV     A,@C_DevBufSize
     MOV     PrgTmp1,A
     MOV     A,@C_E2Addr_DevAddr
@@ -144,76 +140,43 @@ if  Relay4Board<3
 
     CALL    ChkDevAddrError
     JBS     StatusReg,CarryFlag
-    JMP     main
+    JMP     $+5
 _EpromError:
     CALL    DefaultDevAddr
     MOV     DevAddrByte,A
     CALL    DefaultDevAddr+1
     MOV     DevAddrByte+1,A
-endif
 
-if Relay4Board == 3                                          ; 153B  SOP14 封装
-    CLR     DevAddrByte
-    JBC     Port6,2
-    BS      DevAddrByte,1
+;EPROM 读完成，设置电机端口状态
+    MOV     A,@MachineIO_Init
+    IOW     Port6
+    MOV     A,@MachineR_Init
+    MOV     Port6,A
 
-    JBC     Port6,3
-    BS      DevAddrByte,2
-
-    JBC     Port6,4
-    BS      DevAddrByte,3
-
-    JBC     Port6,5
-    BS      DevAddrByte,4
-
-    JBC     Port6,6
-    BS      DevAddrByte,5
-
-    JBC     Port6,7
-    BS      DevAddrByte,6
-
-    JBC     Port5,0
-    BS      DevAddrByte,7
-
-endif
-
-if Relay4Board == 4                        
-	CALL	GroupID
-	MOV	    DevAddrByte,A
-
-    JBC     Port6,2
-    BS      DevAddrByte,1
-
-    JBC     Port6,3
-    BS      DevAddrByte,2
-
-    JBC     Port6,4
-    BS      DevAddrByte,3   
-endif
     JMP     main
 
 
 RelayAction:
-	JBC		RelayStatus,F_RlyOn
-	BS		Relay1Port,Relay_B1
-	JBS		RelayStatus,F_RlyOn
-	BC		Relay1Port,Relay_B1
-if (Relay4Board==1) ||(Relay4Board==2)
-	JBC		RelayStatus,F_RlyOn1
-	BS		Relay2Port,Relay_B2
-	JBS		RelayStatus,F_RlyOn1
-	BC		Relay2Port,Relay_B2
+; 	JBC		RelayStatus,F_RlyOn
+; 	BS		Relay1Port,Relay_B1
+; 	JBS		RelayStatus,F_RlyOn
+; 	BC		Relay1Port,Relay_B1
+; if (Relay4Board==1) ||(Relay4Board==2)
+; 	JBC		RelayStatus,F_RlyOn1
+; 	BS		Relay2Port,Relay_B2
+; 	JBS		RelayStatus,F_RlyOn1
+; 	BC		Relay2Port,Relay_B2
 
-	JBC		RelayStatus,F_RlyOn2
-	BS		Relay3Port,Relay_B3
-	JBS		RelayStatus,F_RlyOn2
-	BC		Relay3Port,Relay_B3
+; 	JBC		RelayStatus,F_RlyOn2
+; 	BS		Relay3Port,Relay_B3
+; 	JBS		RelayStatus,F_RlyOn2
+; 	BC		Relay3Port,Relay_B3
 
-	JBC		RelayStatus,F_RlyOn3
-	BS		Relay4Port,Relay_B4
-	JBS		RelayStatus,F_RlyOn3
-	BC		Relay4Port,Relay_B4
-endif
+; 	JBC		RelayStatus,F_RlyOn3
+; 	BS		Relay4Port,Relay_B4
+; 	JBS		RelayStatus,F_RlyOn3
+; 	BC		Relay4Port,Relay_B4
+; endif
     JMP     main
 
 
@@ -312,51 +275,75 @@ _Timer32ms:
 ;  25ms 中断一次，键盘扫描   256/16384= 1/64	
 ;*******************************************
 ;  单按键程序使用 3个RAM 
-	KeyVibrate		==		10     ; 300MS
 
+; 低电平检测  5* 320 = 1.5 秒
+	Key0Vibrate		==		5     ; 1单位=320ms,   5 = 1.5秒
+; 高电平检测  8*320 = 1.8 秒
+	Key1Vibrate		==		8     ; 1单位=320ms,   8 = 1.8秒
+
+    C_VibMask       ==      0xF0
+    C_TurnsMask     ==      0x0F    
 ;//TODO: KeyScan
     MOV     A,KeyStep
-    ADD     PC,A
-    JMP     _KeyScanStep1
-    JMP     _KeyScanStep2
-    JMP     _KeyScanStep3
-    JMP     _KeyScanStep4
-    JMP     _KeyScanStep5
-    JMP     _KeyConfirmStep1
-    JMP     _KeyConfirmStep2
-    JMP     _KeyConfirmStep3
-    JMP     _KeyConfirmStep4
-    JMP     _KeyConfirmStep5
+    JMP     _KeyScanTable
 _KeyResetStep:
     CLR     KeyStep
 
 _KeyScanStep1:
-_KeyScanStep2:
-_KeyScanStep3:
-_KeyScanStep4:
-_KeyScanStep5:
     BC      KeyCodeCurrent,B_Key1
-    JBS     P_IN1,B_IN1
+    JBC     P_IN1,B_IN1
     BS      KeyCodeCurrent,B_Key1
-
+    JMP     _ChkKeyChange
+_KeyScanStep2:
+    BC      KeyCodeCurrent,B_Key2
+    JBC     P_IN2,B_IN2
+    BS      KeyCodeCurrent,B_Key2
+    JMP     _ChkKeyChange
+_KeyScanStep3:
+    BC      KeyCodeCurrent,B_Key3
+    JBC     P_IN3,B_IN3
+    BS      KeyCodeCurrent,B_Key3
+    JMP     _ChkKeyChange
+_KeyScanStep4:
+    BC      KeyCodeCurrent,B_Key4
+    JBC     P_IN4,B_IN4
+    BS      KeyCodeCurrent,B_Key4
+    JMP     _ChkKeyChange
+_KeyScanStep5:
+    BC      KeyCodeCurrent,B_Key5
+    JBC     P_IN5,B_IN5
+    BS      KeyCodeCurrent,B_Key5
+_ChkKeyChange:
     CALL    _KeyBitMask
-    MOV     PrgTmp1,A
+    MOV     PrgTmp1,A                       ; Prgtmp1 = 位标志
+
+    INC     KeyStep
 
     MOV     A,KeyCodeCurrent
     XOR     A,KeyCodeLast
     AND     A,PrgTmp1
     JBC     StatusReg,ZeroFlag
-    JMP     _KeyNextStep
+    RET
     XOR     KeyCodeLast,A
 
-    MOV     A,Key1Cnt
+    MOV     A,@Key1Cnt
     ADD     A,KeyStep
-    MOV     RamSelReg,A
+    MOV     RamSelReg,A                     ; RamSelReg = 寄存器地址
 
-    MOV     A,@KeyVibrate
-    MOV     R0,A
-_KeyNextStep:
-    INC     KeyStep
+    MOV     A,@~C_VibMask
+    AND     R0,A
+
+    MOV     A,KeyCodeLast
+    AND     A,PrgTmp1
+    JBS     StatusReg,ZeroFlag
+    JMP     $+4
+
+    MOV     A,@Key0Vibrate<<4
+    OR      R0,A
+    RET
+
+    MOV     A,@Key1Vibrate<<4
+    OR      R0,A
     RET
 
 _KeyConfirmStep1:
@@ -366,27 +353,44 @@ _KeyConfirmStep4:
 _KeyConfirmStep5:
 
     MOV     A,KeyStep
-    ADD     A,@Key1Cnt-5
-    MOV     RamSelReg,A
-    MOV     A,R0
-    JBC     StatusReg,ZeroFlag
-    JMP     _KeyNextStep
-
-    MOV     A,R0
-    ADD     A,@0xFF
-    MOV     R0,A
-    JBS     StatusReg,ZeroFlag
-    RET
-
-    MOV     A,KeyStep
     SUB     A,@5
+    MOV     PrgTmp1,A                   ; Prgtmp1 = 第N个电机
     CALL    _KeyBitMask
-    MOV     PrgTmp1,A
-    AND     A,KeyCodeLast
-    JBS     StatusReg,ZeroFlag
-    RET
+    MOV     PrgTmp2,A                   ; Prgtmp2 = 位标志
 
     MOV     A,PrgTmp1
-    OR      KeyFlagReg,A
+    ADD     A,@Key1Cnt
+    MOV     RamSelReg,A                 ; RamSelReg = 寄存器地址
+
+    INC     KeyStep
+
+    MOV     A,R0
+    AND     A,@C_VibMask
+    JBC     StatusReg,ZeroFlag
     RET
+
+    MOV     A,R0
+    SUB     A,@0x10                     ; 检测抖动， 减1
+    MOV     R0,A
+    AND     A,@C_VibMask
+    JBS     StatusReg,ZeroFlag
+    RET
+
+    MOV     A,KeyCodeLast
+    AND     A,PrgTmp2
+    JBS     StatusReg,ZeroFlag          ; 端口由高变低电平时，计数
+    RET
+
+    DEC     R0
+    MOV     A,R0
+    AND     A,@C_TurnsMask
+    JBS     StatusReg,ZeroFlag          ; 电机转数减到 0
+    RET 
+
+    MOV     A,PrgTmp2
+    OR      TxUartFlag,A                ; 设置发送UART标志
+
+    BC      StatusReg,CarryFlag         ; 关闭继电器
+    RLCA    PrgTmp1
+    JMP     _TurnOffRelayTable
 

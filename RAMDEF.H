@@ -19,16 +19,16 @@ Cnt16ms             equ     TRFlagReg    +   1
 Cnt16msBak          equ     Cnt16ms      +   1
 QuitTime            equ     Cnt16msBak   +   1
 KeyStep             equ     QuitTime     +   1
-KeyCodeLast         equ     KeyStep      +   1
-KeyCodeCurrent      equ     KeyCodeLast  +   1
-KeyFlagReg          equ     KeyCodeCurrent+  1
-Key1Cnt             equ     KeyFlagReg   +   1
+KeyCodeLast         equ     KeyStep      +   1  ; 5个开关，5个标志位
+KeyCodeCurrent      equ     KeyCodeLast  +   1  ; 5个开关，5个标志位
+TxUartFlag          equ     KeyCodeCurrent  +   1 ; 发送标志位
+Key1Cnt             equ     TxUartFlag   +   1
 
 
-DataBuf             equ     0x22
+DataBuf             equ     Key1Cnt
 
 CtrlByte            equ     DataBuf
-RelayStatus         equ     CtrlByte     +   1
-ReadID              equ     DevAddrByte  +   1
+;RelayStatus         equ     CtrlByte     +   1
+;ReadID              equ     DevAddrByte  +   1
 
 DataBufEnd          equ     0x2F

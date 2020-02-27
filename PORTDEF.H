@@ -58,9 +58,13 @@ C_SlaverBusOut      equ     0b00111000  ;0b00001011;
     B_IN5           equ     Bit53
 
 ;PCB - 2019.09.13    
-    PortPH_Init		equ		(1<<B_IN2) | (1<<B_IN3)|(1<<SlaverSCL)|(1<<SlaverSDA)
+    PortPH_Init		equ		(1<<B_SDA)|(1<<B_SCL)|(1<<SlaverSDA)|(1<<SlaverSCL)
 
-    P6_IO_Init		equ		(1<<B_IN1) |(1<<B_IN2) | (1<<B_IN3)|(1<<SlaverSCL)|(1<<SlaverSDA)
+    P6_IO_Init		equ		(1<<B_SDA)|(1<<B_SCL)|(1<<SlaverSDA)|(1<<SlaverSCL)|(1<<B_IN3)
     P6_R_Init		equ		0b00000000;
     P5_IO_Init		equ		(1<<B_IN4) | (1<<B_IN5)
     P5_R_Init		equ		0b00000000;
+
+
+    MachineIO_Init  equ     (1<<SlaverSDA)|(1<<SlaverSCL)|(1<<B_IN1)|(1<<B_IN2)|(1<<B_IN3) 
+    MachineR_Init   equ     0
