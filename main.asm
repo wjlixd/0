@@ -373,8 +373,8 @@ _KeyConfirmStep5:
     JBC     StatusReg,ZeroFlag
     RET
 
-    MOV     A,R0
-    SUB     A,@0x10                     ; ¼ì²â¶¶¶¯£¬ ¼õ1
+    MOV     A,@0x10                     ; ¼ì²â¶¶¶¯£¬ ¼õ1
+    SUB     A,R0
     MOV     R0,A
     AND     A,@C_VibMask
     JBS     StatusReg,ZeroFlag
