@@ -6118,6 +6118,7 @@ Step_ChkDevAddr:                          ; 当前接收到的字节为 设备地址ADDR
     JMP     _Step_DevAddrOk
 ;*****************************************************************************************    
 ;            通过广播地址写设备地址， 00 - 01 - 【A1】【A2】
+    BS      SystemFlag,F_WDevAddr           ; 相比 Slaver程序，只是这里做了 **修改2**
     MOV     A,@C_GetBroad1Byte              ; 设备地址为 00，广播地址
 PreSetTxAckRcvByte:
     MOV     StepBak,A

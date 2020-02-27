@@ -1,21 +1,40 @@
-;                   +-------------------+
-;              1+---+P50             P51+---+14
-;                   |                   |
-;              2+---+P67             P52+---+13
-;                   |                   |
-;              3+---+P66             P53+---+12
-;                   |                   |
-;              4+---+VDD             VSS+---+11
-;                   |                   |
-;              5+---+OSCI/P65        P60+---+10
-;                   |                   |
-;              6+---+OSCO/P64        P61+---+9
-;                   |                   |
-;              7+---+RST/P63         P62+---+8
-;                   +-------------------+
+;                   +-------------+
+;              1+---+P50       P51+---+14
+;                   |             |
+;              2+---+P67       P52+---+13
+;                   |             |
+;              3+---+P66       P53+---+12
+;                   |             |
+;              4+---+VDD       VSS+---+11
+;                   |             |
+;              5+---+OSCI      P60+---+10
+;                   |             |
+;              6+---+OSCO      P61+---+9
+;                   |             |
+;              7+---+RST       P62+---+8
+;                   +-------------+
 ;                       EM78P153B
-
-; 2018.07.06,使用 EM78153S仿真器
+;    P63 只能做为输入口， 内部无上拉，无下拉电阻
+;        如果商品唤醒时，需要注意，P63 必须外部接上拉或下地电阻，否则端口不稳定，为连续的唤醒
+;     
+;  EM78911,  EM78P153, EM78P156 
+; 仿真注意事项：
+; 1、所使用端口，
+;      a, EM78911, 可使用P60-P67,P54-P57
+;         em78p153,      P60-P67,P50-P53
+;      b, EM78911, P7口有上拉电阻
+;         78P153,156,  P6有上拉电阻
+;      c, EM78911, P60-P67普通IO口   
+;         em78p153,156, P60外部中断,P63只能输入口
+;      d, EM78911,  P64,P65  普通IO口
+;         em78p153,156, P64,P65与振荡器共用，在使用IRC时，P64,P65做IO口
+;      e, EM78911 - 外部中断口  P70,71,72,73
+;         em78p153, 外部中断口  P60
+;      f, IOCD ,内部上拉电阻控制，   注意2个MCU 完全相反设置
+;         em78911,   0 - 禁止上拉， 1- 使能上拉
+;         em78P153,  0 - 使能上拉， 1- 禁止上拉， 
+;
+;      g, 仿真时，需将WDT关闭。正常运行时打开WDT，仿真是打开WDT将产生WDT复位
 ;
 R0			equ		0x00
 RE			equ		0x0E
@@ -42,6 +61,47 @@ RamSelReg	equ		0x04
     ;        = 256-16*3990000/(128*2*1000)=6.625=-242.75=6.625
 
 
+if  MCU	== EM78911
+; EM78911  中断时间对应 TCC数据
+;    0x26  --  250us  
+;    0x53  --  200us
+;    0x82  --  150us
+	C_InitTcc2K	 ==  0x26
+	C_InitTcc150us==0x82		
+	C_TCC10K	==   0xAC;0Xad	
+	C_Tcc32ms   ==  32
+		;  3.579M , 101us 中断
+		; 9.6K, 一个位，104.1us
+	Port60		equ		0x7
+	Port61		equ		0x7
+	Port62		equ		0x7
+	Port63		equ		0x7
+	Port64		equ		0x7
+	Port65		equ		0x7
+	Port66		equ		0x7
+	Port67		equ		0x7
+
+	Port50		equ		0x5
+	Port51		equ		0x5
+	Port52		equ		0x5
+	Port53		equ		0x5
+	
+	Bit60		equ		0
+	Bit61		equ		1
+	Bit62		equ		2
+	Bit63		equ		3
+	Bit64		equ		4
+	Bit65		equ		5
+	Bit66		equ		6
+	Bit67		equ		7
+
+	Bit50		equ		4
+	Bit51		equ		5
+	Bit52		equ		6
+	Bit53		equ		7
+endif
+
+if  MCU	== EM78P153
 ; EM78P153  中断时间对应 TCC数据( 3.98M IRC)
 ;    0x10  --  250us  
 ;    0x42  --  200us
@@ -77,10 +137,51 @@ RamSelReg	equ		0x04
 	Bit51		equ		1
 	Bit52		equ		2
 	Bit53		equ		3
+endif
+if  MCU	== EM78F734
+	Port60		equ		0x6
+	Port61		equ		0x6
+	Port62		equ		0x6
+	Port63		equ		0x6
+	Port64		equ		0x7
+	Port65		equ		0x7
+	Port66		equ		0x7
+	Port67		equ		0x7
+
+	Port50		equ		0x5
+	Port51		equ		0x5
+	Port52		equ		0x5
+	Port53		equ		0x5
+	
+	Bit60		equ		0
+	Bit61		equ		1
+	Bit62		equ		2
+	Bit63		equ		3
+	Bit64		equ		0
+	Bit65		equ		1
+	Bit66		equ		2
+	Bit67		equ		3
+
+	Bit50		equ		0
+	Bit51		equ		1
+	Bit52		equ		2
+	Bit53		equ		3
+endif
 
 
 
 
+
+
+if MCU == EM78911				; 注意EM78911,P7 与 EM78P153, P6口相同
+	Port6	equ		0x7
+	IOC6	equ		0x7
+
+ 	P50		equ	4				; EM78911,  P54 - P57
+ 	P51		equ	5				; em78p153, P50 - P53
+ 	P52		equ	6
+ 	P53		equ	7
+else
 	Port6	equ		0x6
 	IOC6	equ		0x6
 	
@@ -88,12 +189,15 @@ RamSelReg	equ		0x04
  	P51		equ	1
  	P52		equ	2
  	P53		equ	3
-
+endif
 
 Port5		equ		0x05
 IOC5		equ		0x05
 
 
+;Port7		equ		0x07
+RA			equ		0x0A		;EM78911 使用
+  B_3579E	equ		6
 RF			equ		0x0F
 IntFlagReg	equ		0x0F
 IntFlag		equ		0x0F
@@ -103,10 +207,15 @@ IntFlag		equ		0x0F
 
 IOCB		equ  	0x0B
 ;  153    下拉到地电阻控制寄存器，0-使能下拉，1-禁止下拉。P66-64,P62-60 	
+;  156    同上153
 IOCC		equ	 	0x0C
 ;  153    漏极开路控制，0-禁止开路，1-使能开路，P67-64,P62-60
+;  156    同上153
+;  911  无 OD 功能
 IOCD		equ	 	0x0D
 ;  153    上拉到VCC电阻控制寄存器，0-使能上拉，1-禁止上拉。P67-64,P62-60 ，P63与RST共用，不能上拉
+;  156    ......                   0-使能上拉，1-禁止上拉, P60-P67 都可以
+;  911	  ......                   0-禁止上拉，1-使能内部上拉
 IOCE		equ		0x0E
 ;153    WDT控制， 
 ;    B7-WDTE,  0-WDT禁止，1-WDT使能。   
@@ -123,10 +232,16 @@ IntMaskReg 	equ 	IOCF
   ICIF		equ		1				; Port6 输入变化中断标志位
   ICMask	equ		0x02
 
+
+if MCU==EM78911
+  EXIF			equ		1			;P70中断，其它P71,P72,P73，EM78P153不能用
+  ExtIntPort	equ		Port7
+  ExtMask		equ		0x02
+else  
   EXIF		equ		2			;P60中断
   ExtIntPort	equ		Port6
   ExtMask	equ		0x04
-
+endif
 
 PrgTmp1			equ		0x10
 PrgTmp2			equ		0x11
@@ -185,4 +300,18 @@ OpMode			equ		0x19
 ;    1   1  1    =   256
 ;***************************************************
 
+
+	Rom_Reset		equ		0x00
+
+if 	MCU==EM78F734
+	ROM_Table		equ		0x32
+	Rom_Tcc			equ		0x09
+	Rom_Ext			equ		0x03
+else
+	ROM_Table		equ		0x09
+	Rom_Tcc			equ		0x08
+	Rom_Ext			equ		0x08
+endif
+
+	WDT_Prescaler	equ     00001110b;
 
