@@ -10,13 +10,6 @@ OpenDrain_Init	equ		0b00000000    ;             SDA,SCL 为OD输出
 
 
 ;*****************************************************************************************
-;PCB - 2019.09.13    
-    PortPH_Init		equ		0b00110000;	           P63无上拉，P64,P65带上拉 上拉电阻,SCL,SDA 带上拉
-
-    P6_IO_Init		equ		0b00111011;
-    P6_R_Init		equ		0b00000000;
-    P5_IO_Init		equ		0b00000000;
-    P5_R_Init		equ		0b00000000;
 
     F_SDAInput      equ     2         ; 记录SDA端口当前状态，方便比较
     F_AddrMarried   equ     3         ; 10位地址匹配成功
@@ -24,8 +17,6 @@ OpenDrain_Init	equ		0b00000000    ;             SDA,SCL 为OD输出
     ; SlaverSDA		equ		Bit60     ; 接I2C主设备   
     ; SlaverSCL,SlaverSDA,F_SDAInput 占用0,1,2位，在Portdef.h中定义
 
-    Relay1Port      equ     Port6
-    Relay_B1        equ     Bit62    
 
 C_I2CBusOut         equ     0b00001011;     B_SDA,B_SCL为输出时，其它端口的状态
     B_SDA			equ		Bit64     ; 接 24C02接口
@@ -66,3 +57,10 @@ C_SlaverBusOut      equ     0b00111000  ;0b00001011;
     P_IN5           equ     Port53
     B_IN5           equ     Bit53
 
+;PCB - 2019.09.13    
+    PortPH_Init		equ		(1<<B_IN2) | (1<<B_IN3)|(1<<SlaverSCL)|(1<<SlaverSDA)
+
+    P6_IO_Init		equ		(1<<B_IN1) |(1<<B_IN2) | (1<<B_IN3)|(1<<SlaverSCL)|(1<<SlaverSDA)
+    P6_R_Init		equ		0b00000000;
+    P5_IO_Init		equ		(1<<B_IN4) | (1<<B_IN5)
+    P5_R_Init		equ		0b00000000;
