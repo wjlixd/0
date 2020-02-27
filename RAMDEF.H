@@ -14,8 +14,18 @@ DataPtr             equ     StepBak      +   1  ;
 CLKS                equ     DataPtr      +   1  ;
 Data                equ     CLKS         +   1  ;
 DevAddrByte         equ     Data         +   1  ; 从EPROM 读到的设备地址个数和地址共6个
-DataBuf             equ     DevAddrByte  +   2  ;
+TRFlagReg           equ     DevAddrByte  +   2  ;
+Cnt16ms             equ     TRFlagReg    +   1
+Cnt16msBak          equ     Cnt16ms      +   1
+QuitTime            equ     Cnt16msBak   +   1
+KeyStep             equ     QuitTime     +   1
+KeyCodeLast         equ     KeyStep      +   1
+KeyCodeCurrent      equ     KeyCodeLast  +   1
+KeyFlagReg          equ     KeyCodeCurrent+  1
+Key1Cnt             equ     KeyFlagReg   +   1
 
+
+DataBuf             equ     0x22
 
 CtrlByte            equ     DataBuf
 RelayStatus         equ     CtrlByte     +   1

@@ -10,4 +10,6 @@
     EnI2CMaster ==  1       ;  BOARD = 0,1,2
 ;                           ;  BOARD = 3,4
 ;    DebugI2CSlaver ==  1
-	
+	    IRC8M   ==  0
+        ;  0  使用仿真器， IRC=4M
+        ;  1  使用OTP  ， IRC=8M

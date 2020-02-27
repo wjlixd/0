@@ -52,13 +52,20 @@ GroupID:                        ; 默认 OPT3 初始值
     ; RETL    @0x38               ; 10位地址格式， 低8位
  
 
+_KeyBitMask:
+    ADD     PC,A
+    RETL    @1<<B_Key1
+    RETL    @1<<B_Key2
+    RETL    @1<<B_Key3
+    RETL    @1<<B_Key4
+    RETL    @1<<B_Key5
 
 ;*****************************************
 ;//todo: main
 IntPortEnd:
 main:
 	WDTC
-
+    CALL    SoftTimer
 	JBS		SystemFlag,F_DataValid
 	JMP		IntPort
 	
@@ -239,3 +246,147 @@ endif
 ;***************************************** 
 
     M_I2CMaster201911
+
+
+
+;//TODO: SoftTimer
+SoftTimer:
+    MOV     A,TCC
+    XOR     A,TRFlagReg
+    AND     A,@1<<F_16ms
+    JBC     StatusReg,ZeroFlag
+    RET
+    XOR     TRFlagReg,A
+
+    INC     Cnt16ms
+
+    MOV     A,Cnt16ms
+    XOR     A,Cnt16msBak
+    AND     A,@1<<(IRC8M+1)
+    JBS     StatusReg,ZeroFlag
+    JMP     _Timer32ms
+
+    MOV     A,Cnt16ms
+    XOR     A,Cnt16msBak
+    AND     A,@1<<(IRC8M+3)
+    JBS     StatusReg,ZeroFlag
+    JMP     _Timer250ms
+
+    MOV     A,Cnt16ms
+    XOR     A,Cnt16msBak
+    AND     A,@1<<(IRC8M+5)
+    JBC     StatusReg,ZeroFlag
+    RET
+_Timer500ms:
+    XOR     Cnt16msBak,A
+
+    BS      TRFlagReg,F_500ms
+    JBC     TRFlagReg,F_QuitTime32ms
+    RET
+
+    DJZA    QuitTime                    ; QuitTime =1 时停止减
+    MOV     QuitTime,A
+    RET
+
+_Timer250ms:
+    XOR     Cnt16msBak,A
+    BS      TRFlagReg,F_250ms
+    RET
+
+_Timer32ms:
+    XOR     Cnt16msBak,A
+
+    JBS     TRFlagReg,F_QuitTime32ms
+    JMP     $+3
+    DJZA    QuitTime                    ; QuitTime =1 时停止减
+    MOV     QuitTime,A
+
+    ; M_SingleKeyNoCont20190821
+;**********32ms中断，键盘扫描*****************
+;  32ms 中断一次，键盘扫描   256/16384= 1/64	
+; IntKeyValue    B7 6 5 4 3 2 1 0
+;                   |       |____KeyPin
+;                   +____________KeyLast
+;*******************************************
+;**********25ms中断，键盘扫描*****************
+;  25ms 中断一次，键盘扫描   256/16384= 1/64	
+;*******************************************
+;  单按键程序使用 3个RAM 
+	KeyVibrate		==		10     ; 300MS
+
+;//TODO: KeyScan
+    MOV     A,KeyStep
+    ADD     PC,A
+    JMP     _KeyScanStep1
+    JMP     _KeyScanStep2
+    JMP     _KeyScanStep3
+    JMP     _KeyScanStep4
+    JMP     _KeyScanStep5
+    JMP     _KeyConfirmStep1
+    JMP     _KeyConfirmStep2
+    JMP     _KeyConfirmStep3
+    JMP     _KeyConfirmStep4
+    JMP     _KeyConfirmStep5
+_KeyResetStep:
+    CLR     KeyStep
+
+_KeyScanStep1:
+_KeyScanStep2:
+_KeyScanStep3:
+_KeyScanStep4:
+_KeyScanStep5:
+    BC      KeyCodeCurrent,B_Key1
+    JBS     P_IN1,B_IN1
+    BS      KeyCodeCurrent,B_Key1
+
+    CALL    _KeyBitMask
+    MOV     PrgTmp1,A
+
+    MOV     A,KeyCodeCurrent
+    XOR     A,KeyCodeLast
+    AND     A,PrgTmp1
+    JBC     StatusReg,ZeroFlag
+    JMP     _KeyNextStep
+    XOR     KeyCodeLast,A
+
+    MOV     A,Key1Cnt
+    ADD     A,KeyStep
+    MOV     RamSelReg,A
+
+    MOV     A,@KeyVibrate
+    MOV     R0,A
+_KeyNextStep:
+    INC     KeyStep
+    RET
+
+_KeyConfirmStep1:
+_KeyConfirmStep2:
+_KeyConfirmStep3:
+_KeyConfirmStep4:
+_KeyConfirmStep5:
+
+    MOV     A,KeyStep
+    ADD     A,@Key1Cnt-5
+    MOV     RamSelReg,A
+    MOV     A,R0
+    JBC     StatusReg,ZeroFlag
+    JMP     _KeyNextStep
+
+    MOV     A,R0
+    ADD     A,@0xFF
+    MOV     R0,A
+    JBS     StatusReg,ZeroFlag
+    RET
+
+    MOV     A,KeyStep
+    SUB     A,@5
+    CALL    _KeyBitMask
+    MOV     PrgTmp1,A
+    AND     A,KeyCodeLast
+    JBS     StatusReg,ZeroFlag
+    RET
+
+    MOV     A,PrgTmp1
+    OR      KeyFlagReg,A
+    RET
+
