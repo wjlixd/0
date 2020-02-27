@@ -86,7 +86,6 @@ _KeyScanTable:
     JMP     _KeyConfirmStep3
     JMP     _KeyConfirmStep4
     JMP     _KeyConfirmStep5
-    JMP     _KeyResetStep
 
 ;*****************************************
 ;//todo: main
@@ -284,10 +283,31 @@ _Timer32ms:
     C_VibMask       ==      0xF0
     C_TurnsMask     ==      0x0F    
 ;//TODO: KeyScan
+    MOV     A,@C_RelayNum
+    SUB     A,KeyStep
+    JBS     StatusReg,CarryFlag
+    MOV     A,KeyStep
+    MOV     PrgTmp1,A                   ; Prgtmp1 = 第N个电机
+    ADD     A,@Key1Cnt
+    MOV     RamSelReg,A                 ; RamSelReg = 寄存器地址
+
+    MOV     A,PrgTmp1
+    CALL    _KeyBitMask
+    MOV     PrgTmp2,A                   ; Prgtmp2 = 位标志
+    AND     A,EnKeyReg
+    JBC     StatusReg,ZeroFlag
+    JMP     $+3
+
     MOV     A,KeyStep
     JMP     _KeyScanTable
-_KeyResetStep:
+NextKeyStep:
+    INC     KeyStep
+    MOV     A,@2*C_RelayNum
+    SUB     A,KeyStep
+    JBC     StatusReg,CarryFlag
     CLR     KeyStep
+    RET
+
 
 _KeyScanStep1:
     BC      KeyCodeCurrent,B_Key1
@@ -314,27 +334,21 @@ _KeyScanStep5:
     JBC     P_IN5,B_IN5
     BS      KeyCodeCurrent,B_Key5
 _ChkKeyChange:
-    CALL    _KeyBitMask
-    MOV     PrgTmp1,A                       ; Prgtmp1 = 位标志
 
-    INC     KeyStep
+    CALL    NextKeyStep
 
     MOV     A,KeyCodeCurrent
     XOR     A,KeyCodeLast
-    AND     A,PrgTmp1
+    AND     A,PrgTmp2
     JBC     StatusReg,ZeroFlag
     RET
     XOR     KeyCodeLast,A
-
-    MOV     A,@Key1Cnt
-    ADD     A,KeyStep
-    MOV     RamSelReg,A                     ; RamSelReg = 寄存器地址
 
     MOV     A,@~C_VibMask
     AND     R0,A
 
     MOV     A,KeyCodeLast
-    AND     A,PrgTmp1
+    AND     A,PrgTmp2
     JBS     StatusReg,ZeroFlag
     JMP     $+4
 
@@ -352,17 +366,7 @@ _KeyConfirmStep3:
 _KeyConfirmStep4:
 _KeyConfirmStep5:
 
-    MOV     A,KeyStep
-    SUB     A,@5
-    MOV     PrgTmp1,A                   ; Prgtmp1 = 第N个电机
-    CALL    _KeyBitMask
-    MOV     PrgTmp2,A                   ; Prgtmp2 = 位标志
-
-    MOV     A,PrgTmp1
-    ADD     A,@Key1Cnt
-    MOV     RamSelReg,A                 ; RamSelReg = 寄存器地址
-
-    INC     KeyStep
+    CALL    NextKeyStep
 
     MOV     A,R0
     AND     A,@C_VibMask

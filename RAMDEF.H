@@ -22,7 +22,8 @@ KeyStep             equ     QuitTime     +   1
 KeyCodeLast         equ     KeyStep      +   1  ; 5个开关，5个标志位
 KeyCodeCurrent      equ     KeyCodeLast  +   1  ; 5个开关，5个标志位
 TxUartFlag          equ     KeyCodeCurrent  +   1 ; 发送标志位
-Key1Cnt             equ     TxUartFlag   +   1
+EnKeyReg            equ     TxUartFlag   +   1
+Key1Cnt             equ     EnKeyReg     +   1
 
 
 DataBuf             equ     Key1Cnt

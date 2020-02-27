@@ -33,7 +33,7 @@
     F_EpTRData      equ      1      ; 0 - 不保存收发数据， 1 - 保存收发数据
     F_FindSame      equ      0
 
-
+    C_RelayNum      equ      5      ; 5个继电器
 ;KeyCodeCurrent
     B_Key1          equ      0
     B_Key2          equ      1
