@@ -8,7 +8,8 @@ BlockNum=0
 [EEPROMBlock]
 BlockNum=0
 [BREAKPOINT]
-BP Num=0
+BP Num=1
+BP0=1,A,1241644,1,3984044,635,$\main.asm
 [CODEOPTION]
 Option Num=9
 Target Power=1
@@ -45,18 +46,18 @@ File0=$\main.asm
 File Num=8
 File0=$\DEFMCU.H
 File1=$\OPTION.H
-File2=$\PUBLIC.H
-File3=$\PORTDEF.H
-File4=$\MACRO.H
-File5=$\RAMDEF.H
-File6=$\CONSTDEF.H
+File2=$\MACRO.H
+File3=$\PUBLIC2018.H
+File4=$\PORTDEF.H
+File5=$\CONSTDEF.H
+File6=$\RAMDEF.H
 File7=$\MINI4X8LED.H
 [List Files]
 File Num=1
 File0=$\main.lst
 [Map Files]
 File Num=1
-File0=?
+File0=$\153B.map
 [Library Files]
 File Num=0
 [BOOKMARK]
@@ -108,3 +109,7 @@ Size#1=0
 Size#2=0
 [ICEVOLTAGE SETTING]
 Voltage=1
+[$\CONSTDEF.H]
+Rectangle=0066 0066 0740 0465
+Iconized=0
+Maximized=1

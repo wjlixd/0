@@ -55,7 +55,7 @@
     C_TxStartStep   ==  10
     C_I2cWait       ==  21    
 
-        Crystal   ==   16
+        Crystal   ==   12
 
 if Crystal == 12                ; 晶体选用12M晶振，设置参数
     C_UartTcc      == 77
