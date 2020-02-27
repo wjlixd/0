@@ -26,10 +26,10 @@ EnKeyReg            equ     TxUartFlag   +   1
 Key1Cnt             equ     EnKeyReg     +   1
 
 
-DataBuf             equ     Key1Cnt
-
-CtrlByte            equ     DataBuf
 ;RelayStatus         equ     CtrlByte     +   1
 ;ReadID              equ     DevAddrByte  +   1
 
 DataBufEnd          equ     0x2F
+DataBuf             equ     DataBufEnd - C_RelayNum +1
+
+CtrlByte            equ     DataBuf

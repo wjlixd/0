@@ -39,7 +39,7 @@ DefaultContrast:
 	RETL	@3
 DefaultDevAddr:
 GroupID:                        ; 默认 OPT3 初始值
-    RETL    @0xB0             ; 12位
+    RETL    @0xB2             ; 12位
     RETL    @0xFF
     ; RETL    @0xF0   + (1<<1)    ; 10位地址格式， 高2位
     ; RETL    @0x38               ; 10位地址格式， 低8位
@@ -212,17 +212,17 @@ Step_GetBroad1Byte:
 
 ;*****************************************************************************************    
 _Step_Chk10BitAddr:
-    MOV     A,Data
-    AND     A,@0xFE
-    XOR     A,DevAddrByte                   ; 接收到第一个设备地址字节
-    JBS     StatusReg,ZeroFlag
-    JMP     Error_DevAddrDiff
-
     MOV     A,Data                          ; 高7位地址是相 同的
     AND     A,@0xF8
     XOR     A,@0xF0
     JBS     StatusReg,ZeroFlag              ; 检查高5位是不是 F0
     JMP     _Step_7BitAddr                  ; 是7位地址 ,则进入接收内部地址
+
+    MOV     A,Data
+    AND     A,@0xFE
+    XOR     A,DevAddrByte                   ; 接收到第一个设备地址字节必须相同
+    JBS     StatusReg,ZeroFlag
+    JMP     Error_DevAddrDiff
 
     JBS     Data,0                          ; 第一个设备地址高5位是 F0
     JMP     $+4
@@ -234,15 +234,40 @@ _Step_Chk10BitAddr:
     JMP     PreSetTxAckRcvByte
 
 Step_ChkAddrByte2:                        ; 检测10bit地址第2个字节
-    MOV     A,Data
-    XOR     A,DevAddrByte+1
-    JBS     StatusReg,ZeroFlag
+    MOV     A,DevAddrByte+1
+    ADD     A,@C_RelayNum
+    SUB     A,Data
+    JBC     StatusReg,CarryFlag
     JMP     Error_DevAddrDiff
+
+    MOV     A,DevAddrByte+1
+    SUB     A,Data
+    JBS     StatusReg,CarryFlag
+    JMP     Error_DevAddrDiff    
+    ADD     A,@DataBuf
+    MOV     DataPtr,A
 
     BS      SystemFlag,F_AddrMarried        ; 检测到设备地址 是10位地址，相同
     JMP     _Step_WriteByteAddr
 
 _Step_7BitAddr:                             ; 接收到地址是7bit地址
+    MOV     A,DevAddrByte
+    ADD     A,@C_RelayNum*2
+    SUB     A,Data
+    JBC     StatusReg,CarryFlag
+    JMP     Error_DevAddrDiff
+
+    MOV     A,DevAddrByte
+    SUB     A,Data
+    JBS     StatusReg,CarryFlag
+    JMP     Error_DevAddrDiff
+
+    MOV     PrgTmp1,A
+    BC      StatusReg,CarryFlag
+    RRCA    PrgTmp1
+    ADD     A,@DataBuf
+    MOV     DataPtr,A
+
     JBC     Data,0
     JMP     _Step_DevAddrOk                 ; 读操作 ，7bit地址，读我操作
 _Step_WriteByteAddr:
@@ -252,8 +277,7 @@ _Step_WriteByteAddr:
 ;*****************************************************************************************    
 Step_GetByteAddr:                           ; 接收到的是RAM地址
     MOV     A,Data 
-    ADD     A,@DataBuf
-    MOV     DataPtr,A                       ; 设定数据指针
+    ADD     DataPtr,A                       ; 设定数据指针
 _Step_PreWriteByte:
     MOV     A,@C_WriteByte                  ; 
 	JMP     PreSetTxAckRcvByte              ; 接收到一个字节后，进入 Step06_WriteByte （向我写一个数据）
