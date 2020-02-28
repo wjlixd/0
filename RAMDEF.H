@@ -23,7 +23,6 @@ KeyCodeLast         equ     KeyStep      +   1  ; 5个开关，5个标志位
 KeyCodeCurrent      equ     KeyCodeLast  +   1  ; 5个开关，5个标志位
 TxUartFlag          equ     KeyCodeCurrent  +   1 ; 发送标志位
 EnKeyReg            equ     TxUartFlag   +   1
-Key1Cnt             equ     EnKeyReg     +   1
 
 
 ;RelayStatus         equ     CtrlByte     +   1
@@ -33,3 +32,4 @@ DataBufEnd          equ     0x2F
 DataBuf             equ     DataBufEnd - C_RelayNum +1
 
 CtrlByte            equ     DataBuf
+Key1Cnt             equ     DataBuf        ; 转数寄存器地址共5字节

@@ -683,6 +683,10 @@ _Timer32ms:
     C_VibMask       ==      0xF0
     C_TurnsMask     ==      0x0F    
 ;//TODO: KeyScan
+    MOV     A,EnKeyReg
+    JBC     StatusReg,ZeroFlag
+    RET
+
     MOV     A,@C_RelayNum
     SUB     A,KeyStep
     JBS     StatusReg,CarryFlag
