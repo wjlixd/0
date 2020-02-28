@@ -55,19 +55,13 @@ _KeyBitMask:
     RETL    @1<<B_Key5
 
 _TurnOnRelay:
-    BC      StatusReg,CarryFlag         ; 关闭继电器
-    RLCA    PrgTmp1
+    MOV     A,PrgTmp1
     ADD     PC,A
-    BS      P_RLY1,B_RLY1
-    RET
-    BS      P_RLY2,B_RLY2
-    RET    
-    BS      P_RLY3,B_RLY3
-    RET
-    BS      P_RLY4,B_RLY4
-    RET        
-    BS      P_RLY5,B_RLY5
-    RET    
+    JMP     _Relay1On
+    JMP     _Relay2On
+    JMP     _Relay3On
+    JMP     _Relay4On
+    JMP     _Relay5On
 
 ; 关闭某个继电器
 _TurnOffRelay:
@@ -494,6 +488,7 @@ _EpromError:
 IntPortEnd:
 main:
 	WDTC
+    CALL    TxUartPro
     CALL    SoftTimer
 	JBS		SystemFlag,F_DataValid
 	JMP		IntPort
@@ -557,29 +552,90 @@ _OnOffRelayNext:
     JMP     main
 
 ;*****************************************
+;  打开继电器，记录状态当前电机状态
+_Relay1On:
+    BS      P_RLY1,B_RLY1           ;打开继电器
+    BC      KeyCodeLast,B_Key1
+    JBC     P_IN1,B_IN1
+    BS      KeyCodeLast,B_Key1      ; 设置LastCode 扫描码
+    RET
 
-RelayAction:
-; 	JBC		RelayStatus,F_RlyOn
-; 	BS		Relay1Port,Relay_B1
-; 	JBS		RelayStatus,F_RlyOn
-; 	BC		Relay1Port,Relay_B1
-; if (Relay4Board==1) ||(Relay4Board==2)
-; 	JBC		RelayStatus,F_RlyOn1
-; 	BS		Relay2Port,Relay_B2
-; 	JBS		RelayStatus,F_RlyOn1
-; 	BC		Relay2Port,Relay_B2
+_Relay2On:
+    BS      P_RLY2,B_RLY2           ;打开继电器
+    BC      KeyCodeLast,B_Key2
+    JBC     P_IN2,B_IN2
+    BS      KeyCodeLast,B_Key2      ; 设置LastCode 扫描码
+    RET
 
-; 	JBC		RelayStatus,F_RlyOn2
-; 	BS		Relay3Port,Relay_B3
-; 	JBS		RelayStatus,F_RlyOn2
-; 	BC		Relay3Port,Relay_B3
+_Relay3On:
+    BS      P_RLY3,B_RLY3           ;打开继电器
+    BC      KeyCodeLast,B_Key3
+    JBC     P_IN3,B_IN3
+    BS      KeyCodeLast,B_Key3      ; 设置LastCode 扫描码
+    RET
 
-; 	JBC		RelayStatus,F_RlyOn3
-; 	BS		Relay4Port,Relay_B4
-; 	JBS		RelayStatus,F_RlyOn3
-; 	BC		Relay4Port,Relay_B4
-; endif
-    JMP     main
+_Relay4On:
+    BS      P_RLY4,B_RLY4           ;打开继电器
+    BC      KeyCodeLast,B_Key4
+    JBC     P_IN4,B_IN4
+    BS      KeyCodeLast,B_Key4      ; 设置LastCode 扫描码
+    RET
+
+_Relay5On:
+    BS      P_RLY5,B_RLY5           ;打开继电器
+    BC      KeyCodeLast,B_Key5
+    JBC     P_IN5,B_IN5
+    BS      KeyCodeLast,B_Key5      ; 设置LastCode 扫描码
+    RET
+
+;*****************************************
+TxUartPro:
+    MOV     A,TxUartFlag
+    JBC     StatusReg,ZeroFlag
+    RET
+    CLR     PrgTmp1             ;第N个开关
+_TxUartLoop:
+    CALL    _KeyBitMask
+    AND     A,TxUartFlag
+    JBC     StatusReg,ZeroFlag
+    JMP     _TxUartNext
+
+    MOV     A,DevAddrByte
+    MOV     UartBuf,A
+    MOV     A,DevAddrByte+1
+    MOV     UartBuf+1,A
+    MOV     A,PrgTmp1
+    ADD     A,@Key1Cnt
+    MOV     RamSelReg,A
+    MOV     A,R0
+    AND     A,@C_TurnsMask
+    MOV     UartBuf+2,A
+
+    MOV     A,@C_UartAddr1
+    MOV     PrgTmp5,A
+    MOV     A,@C_UartAddr2
+    MOV     PrgTmp6,A
+    CALL    I2C_UartPageData
+    JBC     StatusReg,CarryFlag
+    RET                             ; 发送出错，
+
+    CALL    _KeyBitMask
+    XOR     A,@C_FlagMask
+    AND     TxUartFlag,A
+    RET
+
+_TxUartNext:
+    INC    PrgTmp1
+    MOV    A,@C_RelayNum
+    SUB    A,PrgTmp1
+    JBS    StatusReg,CarryFlag
+    JMP    _TxUartLoop
+
+    RET
+
+; UART 上报数据
+I2C_UartPageData:
+    RET
 
 
 ;***************************************** 

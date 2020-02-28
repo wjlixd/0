@@ -23,7 +23,7 @@ KeyCodeLast         equ     KeyStep      +   1  ; 5个开关，5个标志位
 KeyCodeCurrent      equ     KeyCodeLast  +   1  ; 5个开关，5个标志位
 TxUartFlag          equ     KeyCodeCurrent  +   1 ; 发送标志位
 EnKeyReg            equ     TxUartFlag   +   1
-
+UartBuf             equ     EnKeyReg     +   1
 
 ;RelayStatus         equ     CtrlByte     +   1
 ;ReadID              equ     DevAddrByte  +   1

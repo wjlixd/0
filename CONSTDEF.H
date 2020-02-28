@@ -41,3 +41,9 @@
     B_Key3          equ      2
     B_Key4          equ      3
     B_Key5          equ      4
+
+;TxUartFlag
+    C_FlagMask      ==      0x1F    ; 5位
+
+    C_UartAddr1     ==      0xF6    ; UART地址  F6F10 ,10位地址
+    C_UartAddr2     ==      0xFE
