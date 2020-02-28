@@ -1,14 +1,15 @@
 ;****************************************************
 ;标志位定义
-;SysFlag
+;SystemFlag
     ;SlaverSCL	equ		Bit61
     ;SlaverSDA	equ		Bit62
     ;F_SDAInput  equ     0       ; SDA 输入端口 标志,用于检测START,STOP
     ;F_AddrMarried equ   3
     ; SlaverSCL,SlaverSDA,F_SDAInput,F_AddrMarried 占用0,1,2,3位，在Portdef.h中定义
     
-    F_WDevAddr  equ     4   
-	F_DataValid equ     6  
+    F_WDevAddr  equ     4       ; 修改 设备地址
+    F_I2CRead   equ     5       ; 0 - 写I2C， 1 - 读I2C
+	F_DataValid equ     6       ; 正常读写结束STOP
 ;RelayStatus
 	F_RlyOn		equ		0		; 继电器状态
     F_RlyOn1    equ     1

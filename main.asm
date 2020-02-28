@@ -39,13 +39,14 @@ DefaultContrast:
 	RETL	@3
 DefaultDevAddr:
 GroupID:                        ; 默认 OPT3 初始值
-    RETL    @0xB2             ; 12位
-    RETL    @0xFF
+    RETL    @0xF0             ; 12位
+    RETL    @0xB0
     ; RETL    @0xF0   + (1<<1)    ; 10位地址格式， 高2位
     ; RETL    @0x38               ; 10位地址格式， 低8位
  
 
 _KeyBitMask:
+    MOV     A,PrgTmp1
     ADD     PC,A
     RETL    @1<<B_Key1
     RETL    @1<<B_Key2
@@ -53,8 +54,25 @@ _KeyBitMask:
     RETL    @1<<B_Key4
     RETL    @1<<B_Key5
 
+_TurnOnRelay:
+    BC      StatusReg,CarryFlag         ; 关闭继电器
+    RLCA    PrgTmp1
+    ADD     PC,A
+    BS      P_RLY1,B_RLY1
+    RET
+    BS      P_RLY2,B_RLY2
+    RET    
+    BS      P_RLY3,B_RLY3
+    RET
+    BS      P_RLY4,B_RLY4
+    RET        
+    BS      P_RLY5,B_RLY5
+    RET    
+
 ; 关闭某个继电器
-_TurnOffRelayTable:
+_TurnOffRelay:
+    BC      StatusReg,CarryFlag         ; 关闭继电器
+    RLCA    PrgTmp1
     ADD     PC,A
     BC      P_RLY1,B_RLY1
     RET
@@ -66,6 +84,7 @@ _TurnOffRelayTable:
     RET        
     BC      P_RLY5,B_RLY5
     RET    
+
 
 _KeyScanTable:
     ADD     PC,A
@@ -80,27 +99,7 @@ _KeyScanTable:
     JMP     _KeyConfirmStep4
     JMP     _KeyConfirmStep5
 
-;*****************************************
-;//todo: main
-IntPortEnd:
-main:
-	WDTC
-    CALL    SoftTimer
-	JBS		SystemFlag,F_DataValid
-	JMP		IntPort
-	
-	BC		SystemFlag,F_DataValid               ; I2C总线接收到 继电器状态改变后，做出动作
-    JBC     SystemFlag,F_WDevAddr
-    CALL    UpdatDevAddr
 
-    C_CtrlMask    ==   0x01
-    
-	MOV     A,CtrlByte
-    CLR     CtrlByte
-    ; AND     A,@C_CtrlMask
-    ; ADD     PC,A
-    JMP     main                                ; 0
-    JMP     RelayAction                         ; 1
 
 ;**********************************************************
 ;    M_I2CSlaver202003           ; I2C 主控程序
@@ -273,6 +272,7 @@ _Step_7BitAddr:                             ; 接收到地址是7bit地址
     JBC     Data,0
     JMP     _Step_DevAddrOk                 ; 读操作 ，7bit地址，读我操作
 _Step_WriteByteAddr:
+    BC      SystemFlag,F_I2CRead            ; 修改*******3 设置写标志
     MOV     A,@C_GetByteAddr                ; 向我写数据
     JMP     PreSetTxAckRcvByte
 
@@ -298,6 +298,8 @@ Step_WriteByte:                             ; 当前进入写数据操作
     JMP     _Step_PreWriteByte
 ;*****************************************************************************************    
 _Step_DevAddrOk:            ;设备地址正确，从我读数据
+    BS      SystemFlag,F_I2CRead            ; 修改*******4 设置写标志
+
     MOV     A,@C_PreTxByte
     MOV     StepBak,A
     MOV     A,@C_TxAck
@@ -487,8 +489,74 @@ _EpromError:
     MOV     A,@MachineR_Init
     MOV     Port6,A
 
+;*****************************************
+;//todo: main
+IntPortEnd:
+main:
+	WDTC
+    CALL    SoftTimer
+	JBS		SystemFlag,F_DataValid
+	JMP		IntPort
+	
+	BC		SystemFlag,F_DataValid               ; I2C总线接收到 继电器状态改变后，做出动作
+    JBC     SystemFlag,F_WDevAddr
+    JMP     UpdatDevAddr                    ; 更新设备地址
+
+    JBC     SystemFlag,F_I2CRead            ; 只处理写电机数据
+    JMP     main                            ; 
+;根据当前数据，获得当前设置电机状态 = tmp2
+    MOV     A,@CtrlByte                     ; 数据处理
+    MOV     RamSelReg,A
+    CLR     PrgTmp1
+    CLR     PrgTmp2                         ; 当前电机开关状态
+_I2CSetSWLoop:
+    MOV     A,R0
+    AND     A,@C_TurnsMask
+    JBC     StatusReg,ZeroFlag
+    JMP     $+3
+
+    CALL    _KeyBitMask
+    OR      PrgTmp2,A
+
+    INC     RamSelReg
+    INC     PrgTmp1
+    MOV     A,@C_RelayNum
+    SUB     A,PrgTmp1
+    JBS     StatusReg,CarryFlag
+    JMP     _I2CSetSWLoop
+;根据当前数据，获得当前设置电机状态 = tmp2
+    MOV     A,PrgTmp2
+    XOR     A,EnKeyReg
+    XOR     EnKeyReg,A          ; 更新开关状态        1 
+    MOV     PrgTmp2,A           ; 需要处理电机位
+    OR      TxUartFlag,A        ; 设置电机向上位报告   2    
+
+    CLR     PrgTmp1             ; 电机开关处理        3
+_OnOffRelayLoop:
+    BC      StatusReg,CarryFlag
+    RRC     PrgTmp2
+    JBS     StatusReg,CarryFlag
+    JMP     _OnOffRelayNext
+
+    CALL    _KeyBitMask
+    AND     A,EnKeyReg
+    JBC     StatusReg,ZeroFlag
+    JMP     $+3
+
+    CALL    _TurnOnRelay
+    JMP     $+2
+
+    CALL    _TurnOffRelay
+_OnOffRelayNext:
+    INC     PrgTmp1
+    MOV     A,@C_RelayNum
+    SUB     A,PrgTmp1
+    JBS     StatusReg,CarryFlag
+    JMP     _OnOffRelayLoop
+
     JMP     main
 
+;*****************************************
 
 RelayAction:
 ; 	JBC		RelayStatus,F_RlyOn
@@ -517,13 +585,11 @@ RelayAction:
 ;***************************************** 
 ; 主设备通过06,07地址修改了设备地址，需要保存在EPROM中
 UpdatDevAddr:
-if  Relay4Board<3
     BC      SystemFlag,F_WDevAddr
-    CLR     CtrlByte
     MOV     A,@DevAddrByte+1
     SUB     A,DataPtr
     JBS     StatusReg,CarryFlag
-    RET
+    JMP     main
 
     MOV     A,@0xA0
     MOV     PrgTmp5,A
@@ -536,10 +602,9 @@ if  Relay4Board<3
     MOV     PrgTmp2,A
     MOV     A,@DevAddrByte
     MOV     RamSelReg,A
-    JMP     I2C_WritePageData      ; 保存
-else
-    RET
-endif
+    CALL    I2C_WritePageData      ; 保存
+    JMP     main
+
 ;***************************************** 
 
     M_I2CMaster201911
@@ -626,7 +691,7 @@ _Timer32ms:
     ADD     A,@Key1Cnt
     MOV     RamSelReg,A                 ; RamSelReg = 寄存器地址
 
-    MOV     A,PrgTmp1
+    ; MOV     A,PrgTmp1
     CALL    _KeyBitMask
     MOV     PrgTmp2,A                   ; Prgtmp2 = 位标志
     AND     A,EnKeyReg
@@ -729,7 +794,5 @@ _KeyConfirmStep5:
     MOV     A,PrgTmp2
     OR      TxUartFlag,A                ; 设置发送UART标志
 
-    BC      StatusReg,CarryFlag         ; 关闭继电器
-    RLCA    PrgTmp1
-    JMP     _TurnOffRelayTable
+    JMP     _TurnOffRelay
 
